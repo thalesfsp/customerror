@@ -5,9 +5,11 @@
 package customerror
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // Demonstrates how to create static, and dynamic custom errors, also how to
@@ -77,6 +79,24 @@ func ExampleNew_is() {
 	errB := NewMissingError("name", WithError(errA))
 
 	fmt.Println(errors.Is(errB, errA))
+
+	// output:
+	// true
+}
+
+// Demonstrates JSON marshalling of custom errors.
+func ExampleNew_marshalJSON() {
+	// New buffer string.
+	var buf strings.Builder
+
+	errA := NewMissingError("id")
+	errB := NewMissingError("name", WithError(errA))
+
+	if err := json.NewEncoder(&buf).Encode(errB); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(strings.Contains(buf.String(), `message":"missing name. Original Error: missing id`))
 
 	// output:
 	// true

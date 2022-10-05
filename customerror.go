@@ -5,6 +5,7 @@
 package customerror
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,7 +19,7 @@ import (
 // and `StatusCode` can be provided.
 type CustomError struct {
 	// Code can be any custom code, e.g.: E1010.
-	Code string `json:"code" validate:"omitempty,startswith=E,gte=2"`
+	Code string `json:"code,omitempty" validate:"omitempty,startswith=E,gte=2"`
 
 	// Err optionally wraps the original error.
 	Err error `json:"-"`
@@ -79,6 +80,23 @@ func (cE *CustomError) Unwrap() error {
 //nolint:errorlint
 func (cE *CustomError) Is(err error) bool {
 	return cE.Err == err
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+//
+// See: https://gist.github.com/thalesfsp/3a1252530750e2370345a2418721ff54
+func (cE *CustomError) MarshalJSON() ([]byte, error) {
+	type Alias CustomError
+
+	b := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(cE),
+	}
+
+	b.Message = cE.Error()
+
+	return json.Marshal(b)
 }
 
 // Wrap `customError` around `errors`.

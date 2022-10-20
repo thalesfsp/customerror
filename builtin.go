@@ -7,6 +7,7 @@ package customerror
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 //////
@@ -55,5 +56,13 @@ func NewRequiredError(message string, opts ...Option) error {
 	return New(fmt.Sprintf("%s required", message), prependOptions(
 		opts,
 		WithStatusCode(http.StatusBadRequest),
+	)...)
+}
+
+// NewHTTPError is the building block for simple HTTP errors, e.g.: Not Found.
+func NewHTTPError(statusCode int, opts ...Option) error {
+	return New(strings.ToLower(http.StatusText(statusCode)), prependOptions(
+		opts,
+		WithStatusCode(statusCode),
 	)...)
 }

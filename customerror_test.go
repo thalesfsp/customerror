@@ -112,6 +112,7 @@ func TestBuiltin(t *testing.T) {
 	ErrInvalidPath := NewInvalidError("path")
 	ErrMissingPath := NewMissingError("path")
 	ErrRequiredPath := NewRequiredError("path is")
+	ErrNotFound := NewHTTPError(http.StatusNotFound)
 
 	testFunc := func(e error) error { return e }
 
@@ -155,6 +156,14 @@ func TestBuiltin(t *testing.T) {
 			},
 			want:   "path is required",
 			wantAs: "path is required",
+		},
+		{
+			name: "Should work - ErrNotFound",
+			args: args{
+				err: ErrNotFound,
+			},
+			want:   "not found",
+			wantAs: "not found",
 		},
 	}
 	for _, tt := range tests {

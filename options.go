@@ -45,9 +45,9 @@ func WithCode(code string) Option {
 }
 
 // WithStatusCode allows to specify the status code, such as "200".
-func WithStatusCode(statucCode int) Option {
+func WithStatusCode(statusCode int) Option {
 	return func(cE *CustomError) {
-		cE.StatusCode = statucCode
+		cE.StatusCode = statusCode
 	}
 }
 

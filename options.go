@@ -62,8 +62,14 @@ func WithIgnoreFunc(f func(cE *CustomError) bool) Option {
 
 // WithIgnoreString ignores an error if the error message contains the specified
 // string.
-func WithIgnoreString(s string) Option {
+func WithIgnoreString(s ...string) Option {
 	return WithIgnoreFunc(func(cE *CustomError) bool {
-		return strings.Contains(cE.Error(), s)
+		for _, str := range s {
+			if strings.Contains(cE.Message, str) {
+				return true
+			}
+		}
+
+		return false
 	})
 }

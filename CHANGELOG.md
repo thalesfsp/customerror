@@ -5,10 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2022-10-21
+### Added
+- `WithIgnoreString` `Option` accepts a slice of strings.
+- Added ability to create messages with just `StatusCode`, or just `Code`, but no `Message`. `StatusCode` takes precedence over `Code`.
+
 ## [1.0.8] - 2022-10-21
 ### Added
 - `WithIgnoreFunc` `Option` which allows to ignore the error (return `nil`) under the specified condition.
-- `WithIgnoreString` `Option` which allows to ignore the error (return `nil`) if message contains the specified **string**.
+- `WithIgnoreString` `Option` which allows to ignore the error (return `nil`) if `Message` contains the specified **string**.
 - `NewHTTPError` test.
 
 ## [1.0.7] - 2022-10-20

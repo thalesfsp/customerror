@@ -105,9 +105,11 @@ func ExampleNew_marshalJSON() {
 // Demonstrates the WithIgnoreString option.
 func ExampleNew_optionsWithIgnoreString() {
 	fmt.Println(NewMissingError("id", WithIgnoreString("id")) == nil)
+	fmt.Println(NewMissingError("id", WithIgnoreString("hahaha")) == nil)
 
 	// output:
 	// true
+	// false
 }
 
 // Demonstrates the WithIgnoreFunc option.
@@ -132,4 +134,29 @@ func ExampleNew_newHTTPError() {
 	// not found (404 - Not Found)
 	// not found
 	// not found
+}
+
+// Demonstrates errors without message but with status code.
+//
+//nolint:errorlint,forcetypeassert
+func ExampleNew_newNoMessage() {
+	fmt.Println(New("", WithStatusCode(http.StatusAccepted)))
+	fmt.Println(New("", WithStatusCode(http.StatusAccepted), WithCode("E1010")))
+	fmt.Println(New("", WithStatusCode(http.StatusAccepted)).(*CustomError).APIError())
+	fmt.Println(New("", WithStatusCode(http.StatusAccepted), WithCode("E1010")).(*CustomError).APIError())
+
+	fmt.Println(New("", WithCode("E1010")))
+	fmt.Println(New("", WithCode("E1010"), WithStatusCode(http.StatusAccepted)))
+	fmt.Println(New("", WithCode("E1010")).(*CustomError).APIError())
+	fmt.Println(New("", WithCode("E1010"), WithStatusCode(http.StatusAccepted)).(*CustomError).APIError())
+
+	// output:
+	// Accepted
+	// E1010: Accepted
+	// Accepted (202)
+	// E1010: Accepted (202)
+	// E1010
+	// E1010: Accepted
+	// E1010
+	// E1010: Accepted (202)
 }

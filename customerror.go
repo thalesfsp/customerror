@@ -44,7 +44,11 @@ func (cE *CustomError) Error() string {
 	errMsg := cE.Message
 
 	if cE.Code != "" {
-		errMsg = fmt.Sprintf("%s: %s", cE.Code, errMsg)
+		if cE.Message != cE.Code {
+			errMsg = fmt.Sprintf("%s: %s", cE.Code, errMsg)
+		} else {
+			errMsg = cE.Code
+		}
 	}
 
 	if cE.Err != nil {
@@ -59,11 +63,19 @@ func (cE *CustomError) APIError() string {
 	errMsg := cE.Message
 
 	if cE.Code != "" {
-		errMsg = fmt.Sprintf("%s: %s", cE.Code, errMsg)
+		if cE.Message != cE.Code {
+			errMsg = fmt.Sprintf("%s: %s", cE.Code, errMsg)
+		} else {
+			errMsg = cE.Code
+		}
 	}
 
 	if cE.StatusCode != 0 {
-		errMsg = fmt.Sprintf("%s (%d - %s)", errMsg, cE.StatusCode, http.StatusText(cE.StatusCode))
+		if cE.Message != http.StatusText(cE.StatusCode) {
+			errMsg = fmt.Sprintf("%s (%d - %s)", errMsg, cE.StatusCode, http.StatusText(cE.StatusCode))
+		} else {
+			errMsg = fmt.Sprintf("%s (%d)", errMsg, cE.StatusCode)
+		}
 	}
 
 	if cE.Err != nil {
@@ -131,6 +143,15 @@ func New(message string, opts ...Option) error {
 		opt(cE)
 	}
 
+	// Should use status code if no message is set. Status code should be
+	// priority.
+	if cE.Message == "" && cE.StatusCode > 0 {
+		cE.Message = http.StatusText(cE.StatusCode)
+	} else if cE.Message == "" && cE.Code != "" {
+		cE.Message = cE.Code
+	}
+
+	// Should be able to programatically ignore errors (`WithIgnoreFunc`).
 	if cE.ignore {
 		return nil
 	}

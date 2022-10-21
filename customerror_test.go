@@ -108,11 +108,11 @@ func TestNewLowLevel(t *testing.T) {
 }
 
 func TestBuiltin(t *testing.T) {
-	ErrFailedToCreateFile := NewFailedToError("create file")
-	ErrInvalidPath := NewInvalidError("path")
-	ErrMissingPath := NewMissingError("path")
-	ErrRequiredPath := NewRequiredError("path is")
-	ErrNotFound := NewHTTPError(http.StatusNotFound)
+	ErrFailedToCreateFile := NewFailedToError("create file", WithCode("E1010"))
+	ErrInvalidPath := NewInvalidError("path", WithCode("E1010"))
+	ErrMissingPath := NewMissingError("path", WithCode("E1010"))
+	ErrRequiredPath := NewRequiredError("path is", WithCode("E1010"))
+	ErrNotFound := NewHTTPError(http.StatusNotFound, WithCode("E1010"))
 
 	testFunc := func(e error) error { return e }
 
@@ -120,21 +120,27 @@ func TestBuiltin(t *testing.T) {
 		err error
 	}
 	tests := []struct {
-		name   string
-		args   args
-		want   string
-		wantAs string
+		args               args
+		expectedCode       string
+		expectedStatusCode int
+		name               string
+		want               string
+		wantAs             string
 	}{
 		{
-			name: "Should work - ErrFailedToCreateFile",
+			name:               "Should work - ErrFailedToCreateFile",
+			expectedCode:       "E1010",
+			expectedStatusCode: http.StatusInternalServerError,
 			args: args{
 				err: ErrFailedToCreateFile,
 			},
-			want:   "failed to create file",
-			wantAs: "failed to create file",
+			want:   "create file",
+			wantAs: "create file",
 		},
 		{
-			name: "Should work - ErrInvalidPath",
+			name:               "Should work - ErrInvalidPath",
+			expectedCode:       "E1010",
+			expectedStatusCode: http.StatusBadRequest,
 			args: args{
 				err: ErrInvalidPath,
 			},
@@ -142,7 +148,9 @@ func TestBuiltin(t *testing.T) {
 			wantAs: "invalid path",
 		},
 		{
-			name: "Should work - ErrMissingPath",
+			name:               "Should work - ErrMissingPath",
+			expectedCode:       "E1010",
+			expectedStatusCode: http.StatusBadRequest,
 			args: args{
 				err: ErrMissingPath,
 			},
@@ -150,7 +158,9 @@ func TestBuiltin(t *testing.T) {
 			wantAs: "missing path",
 		},
 		{
-			name: "Should work - ErrRequiredPath",
+			name:               "Should work - ErrRequiredPath",
+			expectedCode:       "E1010",
+			expectedStatusCode: http.StatusBadRequest,
 			args: args{
 				err: ErrRequiredPath,
 			},
@@ -158,7 +168,9 @@ func TestBuiltin(t *testing.T) {
 			wantAs: "path is required",
 		},
 		{
-			name: "Should work - ErrNotFound",
+			name:               "Should work - ErrNotFound",
+			expectedCode:       "E1010",
+			expectedStatusCode: http.StatusNotFound,
 			args: args{
 				err: ErrNotFound,
 			},
@@ -179,14 +191,26 @@ func TestBuiltin(t *testing.T) {
 				t.Errorf("Expected error to be (is - wrapped) %v, got %v", tt.args.err, errWrapped)
 			}
 
-			if !strings.EqualFold(err.Error(), tt.want) {
+			if !strings.Contains(err.Error(), tt.want) {
 				t.Errorf(`Expected message to be "%v", got "%v"`, tt.want, err)
 			}
 
 			var errAs *CustomError
 			if errors.As(err, &errAs) {
-				if errAs.Message != tt.wantAs {
+				if !strings.Contains(errAs.Message, tt.wantAs) {
 					t.Errorf(`Expected message to be (As)"%v", got "%v"`, tt.wantAs, errAs.Message)
+				}
+
+				if errAs.Code != tt.expectedCode {
+					t.Errorf(`Expected code to be "%v", got "%v"`, tt.expectedCode, errAs.Code)
+				}
+
+				if errAs.StatusCode != tt.expectedStatusCode {
+					t.Errorf(`Expected status code to be "%d", got "%d"`, tt.expectedStatusCode, errAs.StatusCode)
+				}
+
+				if errAs.APIError() == "" {
+					t.Errorf(`Expected APIError to be empty, got "%v"`, errAs.APIError())
 				}
 			}
 		})
@@ -303,4 +327,22 @@ func TestWrap(t *testing.T) {
 	if !errors.Is(Wrap(errLayered, errSome), ErrLayered) {
 		t.Errorf("Wrap Is got %s, want %s", errSome, ErrLayered)
 	}
+}
+
+// Test invalid custom error.
+//
+//nolint:forcetypeassert
+func TestNew_InvalidCustomError(t *testing.T) {
+	t.Setenv("CUSTOMERROR_ENVIRONMENT", "testing")
+
+	// Recover from panic, and test error message.
+	defer func() {
+		if r := recover(); r != nil {
+			if !strings.Contains(r.(string), "Invalid custom error") {
+				t.Fatal("Expected panic message to be 'hahaha', got", r)
+			}
+		}
+	}()
+
+	_ = New("")
 }

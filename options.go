@@ -13,6 +13,8 @@
 
 package customerror
 
+import "strings"
+
 // Option allows to define error options.
 type Option func(s *CustomError)
 
@@ -30,21 +32,38 @@ func prependOptions(source []Option, item Option) []Option {
 // WithError allows to specify an error which will be wrapped by the custom
 // error.
 func WithError(err error) Option {
-	return func(s *CustomError) {
-		s.Err = err
+	return func(cE *CustomError) {
+		cE.Err = err
 	}
 }
 
 // WithCode allows to specify an error code, such as "E1010".
 func WithCode(code string) Option {
-	return func(s *CustomError) {
-		s.Code = code
+	return func(cE *CustomError) {
+		cE.Code = code
 	}
 }
 
 // WithStatusCode allows to specify the status code, such as "200".
 func WithStatusCode(statucCode int) Option {
-	return func(s *CustomError) {
-		s.StatusCode = statucCode
+	return func(cE *CustomError) {
+		cE.StatusCode = statucCode
 	}
+}
+
+// WithIgnoreFunc ignores an error if the specified function returns true.
+func WithIgnoreFunc(f func(cE *CustomError) bool) Option {
+	return func(cE *CustomError) {
+		if f(cE) {
+			cE.ignore = true
+		}
+	}
+}
+
+// WithIgnoreString ignores an error if the error message contains the specified
+// string.
+func WithIgnoreString(s string) Option {
+	return WithIgnoreFunc(func(cE *CustomError) bool {
+		return strings.Contains(cE.Error(), s)
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -29,6 +30,9 @@ type CustomError struct {
 
 	// StatusCode is a valid HTTP status code, e.g.: 404.
 	StatusCode int `json:"-" validate:"omitempty,gte=100,lte=511"`
+
+	// If set to true, the error will be ignored (return nil).
+	ignore bool `json:"-"`
 }
 
 //////
@@ -120,14 +124,23 @@ func Wrap(customError error, errors ...error) error {
 func New(message string, opts ...Option) error {
 	cE := &CustomError{
 		Message: message,
+		ignore:  false,
 	}
 
 	for _, opt := range opts {
 		opt(cE)
 	}
 
+	if cE.ignore {
+		return nil
+	}
+
 	if err := validator.New().Struct(cE); err != nil {
-		log.Fatalf("Invalid custom error. %s\n", err)
+		if os.Getenv("CUSTOMERROR_ENVIRONMENT") == "testing" {
+			log.Panicf("Invalid custom error. %s\n", err)
+		} else {
+			log.Fatalf("Invalid custom error. %s\n", err)
+		}
 
 		return nil
 	}

@@ -101,3 +101,35 @@ func ExampleNew_marshalJSON() {
 	// output:
 	// true
 }
+
+// Demonstrates the WithIgnoreString option.
+func ExampleNew_optionsWithIgnoreString() {
+	fmt.Println(NewMissingError("id", WithIgnoreString("id")) == nil)
+
+	// output:
+	// true
+}
+
+// Demonstrates the WithIgnoreFunc option.
+func ExampleNew_optionsWithIgnoreIf() {
+	fmt.Println(NewMissingError("id", WithIgnoreFunc(func(cE *CustomError) bool {
+		return strings.Contains(cE.Message, "id")
+	})) == nil)
+
+	// output:
+	// true
+}
+
+// Demonstrates the NewHTTPError custom error.
+//
+//nolint:errorlint,forcetypeassert
+func ExampleNew_newHTTPError() {
+	fmt.Println(NewHTTPError(http.StatusNotFound).(*CustomError).APIError())
+	fmt.Println(NewHTTPError(http.StatusNotFound).(*CustomError).Error())
+	fmt.Println(NewHTTPError(http.StatusNotFound))
+
+	// output:
+	// not found (404 - Not Found)
+	// not found
+	// not found
+}

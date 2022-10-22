@@ -31,6 +31,9 @@ type CustomError struct {
 	// StatusCode is a valid HTTP status code, e.g.: 404.
 	StatusCode int `json:"-" validate:"omitempty,gte=100,lte=511"`
 
+	// Tags is a list of tags which helps to categorize the error.
+	Tags []string `json:"tags,omitempty"`
+
 	// If set to true, the error will be ignored (return nil).
 	ignore bool `json:"-"`
 }
@@ -49,6 +52,10 @@ func (cE *CustomError) Error() string {
 		} else {
 			errMsg = cE.Code
 		}
+	}
+
+	if cE.Tags != nil {
+		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, strings.Join(cE.Tags, ", "))
 	}
 
 	if cE.Err != nil {
@@ -76,6 +83,10 @@ func (cE *CustomError) APIError() string {
 		} else {
 			errMsg = fmt.Sprintf("%s (%d)", errMsg, cE.StatusCode)
 		}
+	}
+
+	if cE.Tags != nil {
+		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, strings.Join(cE.Tags, ", "))
 	}
 
 	if cE.Err != nil {

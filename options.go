@@ -73,3 +73,10 @@ func WithIgnoreString(s ...string) Option {
 		return false
 	})
 }
+
+// WithTag allows to specify tags for the error.
+func WithTag(tag ...string) Option {
+	return func(cE *CustomError) {
+		cE.Tags = tag
+	}
+}

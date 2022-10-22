@@ -160,3 +160,28 @@ func ExampleNew_newNoMessage() {
 	// E1010
 	// E1010: Accepted (202)
 }
+
+// Demonstrates the WithTag option.
+//
+//nolint:errorlint,forcetypeassert
+func ExampleNew_optionsWithTag() {
+	fmt.Println(NewMissingError(
+		"id",
+		WithTag("test1", "test2"),
+		WithCode("E1010"),
+		WithStatusCode(http.StatusNotAcceptable),
+		WithError(errors.New("some error")),
+	))
+
+	fmt.Println(NewMissingError(
+		"id",
+		WithTag("test1", "test2"),
+		WithCode("E1010"),
+		WithStatusCode(http.StatusNotAcceptable),
+		WithError(errors.New("some error")),
+	).(*CustomError).APIError())
+
+	// output:
+	// E1010: missing id. Tags: test1, test2. Original Error: some error
+	// E1010: missing id (406 - Not Acceptable). Tags: test1, test2. Original Error: some error
+}

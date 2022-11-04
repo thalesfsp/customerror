@@ -105,9 +105,11 @@ func ExampleNew_marshalJSON() {
 // Demonstrates the WithIgnoreString option.
 func ExampleNew_optionsWithIgnoreString() {
 	fmt.Println(NewMissingError("id", WithIgnoreString("id")) == nil)
+	fmt.Println(NewMissingError("id", WithError(errors.New("hehehe")), WithIgnoreString("hehehe")) == nil)
 	fmt.Println(NewMissingError("id", WithIgnoreString("hahaha")) == nil)
 
 	// output:
+	// true
 	// true
 	// false
 }

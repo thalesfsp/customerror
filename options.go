@@ -60,12 +60,16 @@ func WithIgnoreFunc(f func(cE *CustomError) bool) Option {
 	}
 }
 
-// WithIgnoreString ignores an error if the error message contains the specified
-// string.
+// WithIgnoreString ignores an error if the error message, or the the underlying
+// error message contains the specified string.
 func WithIgnoreString(s ...string) Option {
 	return WithIgnoreFunc(func(cE *CustomError) bool {
 		for _, str := range s {
 			if strings.Contains(cE.Message, str) {
+				return true
+			}
+
+			if cE.Err != nil && strings.Contains(cE.Err.Error(), str) {
 				return true
 			}
 		}

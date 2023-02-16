@@ -84,3 +84,10 @@ func WithTag(tag ...string) Option {
 		cE.Tags = tag
 	}
 }
+
+// WithField allows to specify fields for the error.
+func WithField(fields map[string]interface{}) Option {
+	return func(cE *CustomError) {
+		cE.Fields = fields
+	}
+}

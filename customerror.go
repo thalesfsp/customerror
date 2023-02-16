@@ -15,6 +15,25 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+//////
+// Helpers.
+//////
+
+// Process fields and add them to the error message.
+func processFields(errMsg string, fields map[string]interface{}) string {
+	if fields != nil {
+		errMsg = fmt.Sprintf("%s. Fields:", errMsg)
+
+		for k, v := range fields {
+			errMsg = fmt.Sprintf("%s %s=%v,", errMsg, k, v)
+		}
+
+		errMsg = strings.TrimSuffix(errMsg, ",")
+	}
+
+	return errMsg
+}
+
 // CustomError is the base block to create custom errors. It provides context -
 // a `Message` to an optional `Err`. Additionally a `Code` - for example "E1010",
 // and `StatusCode` can be provided.
@@ -24,6 +43,9 @@ type CustomError struct {
 
 	// Err optionally wraps the original error.
 	Err error `json:"-"`
+
+	// Field enhances the error message with more structured information.
+	Fields map[string]interface{} `json:"fields,omitempty"`
 
 	// Human readable message. Minimum length: 3.
 	Message string `json:"message" validate:"required,gte=3"`
@@ -54,13 +76,15 @@ func (cE *CustomError) Error() string {
 		}
 	}
 
+	if cE.Err != nil {
+		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
+	}
+
 	if cE.Tags != nil {
 		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, strings.Join(cE.Tags, ", "))
 	}
 
-	if cE.Err != nil {
-		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
-	}
+	errMsg = processFields(errMsg, cE.Fields)
 
 	return errMsg
 }
@@ -85,13 +109,15 @@ func (cE *CustomError) APIError() string {
 		}
 	}
 
+	if cE.Err != nil {
+		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
+	}
+
 	if cE.Tags != nil {
 		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, strings.Join(cE.Tags, ", "))
 	}
 
-	if cE.Err != nil {
-		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
-	}
+	errMsg = processFields(errMsg, cE.Fields)
 
 	return errMsg
 }
@@ -104,7 +130,7 @@ func (cE *CustomError) Unwrap() error {
 // Is interface implementation ensures chain continuity. Treats `CustomError` as
 // equivalent to `err`.
 //
-//nolint:errorlint
+
 func (cE *CustomError) Is(err error) bool {
 	return cE.Err == err
 }

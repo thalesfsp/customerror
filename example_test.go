@@ -184,6 +184,39 @@ func ExampleNew_optionsWithTag() {
 	).(*CustomError).APIError())
 
 	// output:
-	// E1010: missing id. Tags: test1, test2. Original Error: some error
-	// E1010: missing id (406 - Not Acceptable). Tags: test1, test2. Original Error: some error
+	// E1010: missing id. Original Error: some error. Tags: test1, test2
+	// E1010: missing id (406 - Not Acceptable). Original Error: some error. Tags: test1, test2
+}
+
+// Demonstrates the WithFields option.
+//
+//nolint:errorlint,forcetypeassert
+func ExampleNew_optionsWithFields() {
+	fmt.Println(NewMissingError(
+		"id",
+		WithTag("test1", "test2"),
+		WithField(map[string]interface{}{
+			"testKey1": "testValue1",
+			"testKey2": "testValue2",
+		}),
+		WithCode("E1010"),
+		WithStatusCode(http.StatusNotAcceptable),
+		WithError(errors.New("some error")),
+	))
+
+	fmt.Println(NewMissingError(
+		"id",
+		WithTag("test1", "test2"),
+		WithField(map[string]interface{}{
+			"testKey1": "testValue1",
+			"testKey2": "testValue2",
+		}),
+		WithCode("E1010"),
+		WithStatusCode(http.StatusNotAcceptable),
+		WithError(errors.New("some error")),
+	).(*CustomError).APIError())
+
+	// output:
+	// E1010: missing id. Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
+	// E1010: missing id (406 - Not Acceptable). Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
 }

@@ -130,7 +130,7 @@ func (cE *CustomError) Unwrap() error {
 // Is interface implementation ensures chain continuity. Treats `CustomError` as
 // equivalent to `err`.
 //
-
+//nolint:errorlint
 func (cE *CustomError) Is(err error) bool {
 	return cE.Err == err
 }

@@ -37,11 +37,13 @@ func processFields(errMsg string, fields map[string]interface{}) string {
 // dedupTags removes duplicate tags.
 func dedupTags(tags []string) []string {
 	keys := make(map[string]bool)
+
 	list := []string{}
 
 	for _, entry := range tags {
 		if _, value := keys[entry]; !value {
 			keys[entry] = true
+
 			list = append(list, entry)
 		}
 	}
@@ -145,7 +147,7 @@ func (cE *CustomError) Unwrap() error {
 // Is interface implementation ensures chain continuity. Treats `CustomError` as
 // equivalent to `err`.
 //
-//nolint:errorlint
+
 func (cE *CustomError) Is(err error) bool {
 	return cE.Err == err
 }
@@ -326,7 +328,7 @@ func New(message string, opts ...Option) error {
 // - `NewInvalidError`
 // - `NewMissingError`
 // - `NewRequiredError`
-// - `NewHTTPError`
+// - `NewHTTPError`.
 func NewFactory(fields map[string]interface{}, tags ...string) *CustomError {
 	return &CustomError{
 		Fields: fields,

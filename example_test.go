@@ -234,7 +234,8 @@ func ExampleNew_optionsWithFields() {
 	// E1010: missing id (406 - Not Acceptable). Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
 }
 
-func ExampleNew_NewFactory() {
+// ExampleNew_NewFactory demonstrates the usage of the NewFactory function.
+func ExampleNew_newFactory() {
 	factory := NewFactory(
 		map[string]interface{}{
 			"test1": "test2",

@@ -5,12 +5,25 @@
 package customerror
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 )
+
+func checkIfStringContainsMany(s string, subs ...string) []string {
+	missing := []string{}
+
+	for _, sub := range subs {
+		if !strings.Contains(s, sub) {
+			missing = append(missing, sub)
+		}
+	}
+
+	return missing
+}
 
 // Demonstrates how to create static, and dynamic custom errors, also how to
 // check, and instrospect custom errors.
@@ -219,4 +232,44 @@ func ExampleNew_optionsWithFields() {
 	// output:
 	// E1010: missing id. Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
 	// E1010: missing id (406 - Not Acceptable). Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
+}
+
+func ExampleNew_NewFactory() {
+	factory := NewFactory(
+		map[string]interface{}{
+			"test1": "test2",
+			"test3": "test4",
+		},
+		"testTag1", "testTag2", "testTag3",
+	)
+
+	childFactory := factory.NewChildError(
+		map[string]interface{}{
+			"test1": "test2",
+			"test5": "test6",
+		},
+		"testTag2", "testTag3", "testTag4",
+	)
+
+	// Write to a buffer and check the output.
+	var buf bytes.Buffer
+
+	fmt.Fprint(&buf, childFactory.NewMissingError("id"))
+	fmt.Fprint(&buf, childFactory.NewFailedToError("insert id"))
+	fmt.Fprint(&buf, childFactory.NewInvalidError("id"))
+	fmt.Fprint(&buf, childFactory.NewMissingError("id"))
+	fmt.Fprint(&buf, childFactory.NewRequiredError("id"))
+	fmt.Fprint(&buf, childFactory.NewHTTPError(400))
+
+	finalMessage := buf.String()
+
+	fmt.Println(len(checkIfStringContainsMany(
+		finalMessage,
+		"missing id", "failed to insert id", "invalid id", "missing id", "id required", "bad request",
+		"Tags:", "Fields:", "testTag1", "testTag2", "testTag3", "testTag4",
+		"test1=test2", "test3=test4", "test5=test6",
+	)) == 0)
+
+	// output:
+	// true
 }

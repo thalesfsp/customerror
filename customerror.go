@@ -34,6 +34,21 @@ func processFields(errMsg string, fields map[string]interface{}) string {
 	return errMsg
 }
 
+// dedupTags removes duplicate tags.
+func dedupTags(tags []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+
+	for _, entry := range tags {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+
+	return list
+}
+
 // CustomError is the base block to create custom errors. It provides context -
 // a `Message` to an optional `Err`. Additionally a `Code` - for example "E1010",
 // and `StatusCode` can be provided.
@@ -165,6 +180,105 @@ func Wrap(customError error, errors ...error) error {
 	return fmt.Errorf("%w. Wrapped Error(s): %s", customError, strings.Join(errMsgs, ". "))
 }
 
+// NewFailedToError is the building block for errors usually thrown when some
+// action failed, e.g: "Failed to create host". Default status code is `500`.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewFailedToError(message string, opts ...Option) error {
+	finalOpts := []Option{
+		WithTag(cE.Tags...),
+		WithField(cE.Fields),
+	}
+
+	// Add opts to finalOpts.
+	finalOpts = append(finalOpts, opts...)
+
+	return NewFailedToError(message, finalOpts...)
+}
+
+// NewInvalidError is the building block for errors usually thrown when
+// something fail validation, e.g: "Invalid port". Default status code is `400`.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewInvalidError(message string, opts ...Option) error {
+	finalOpts := []Option{
+		WithTag(cE.Tags...),
+		WithField(cE.Fields),
+	}
+
+	// Add opts to finalOpts.
+	finalOpts = append(finalOpts, opts...)
+
+	return NewInvalidError(message, finalOpts...)
+}
+
+// NewMissingError is the building block for errors usually thrown when required
+// information is missing, e.g: "Missing host". Default status code is `400`.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewMissingError(message string, opts ...Option) error {
+	finalOpts := []Option{
+		WithTag(cE.Tags...),
+		WithField(cE.Fields),
+	}
+
+	// Add opts to finalOpts.
+	finalOpts = append(finalOpts, opts...)
+
+	return NewMissingError(message, finalOpts...)
+}
+
+// NewRequiredError is the building block for errors usually thrown when
+// required information is missing, e.g: "Port is required". Default status code is `400`.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewRequiredError(message string, opts ...Option) error {
+	finalOpts := []Option{
+		WithTag(cE.Tags...),
+		WithField(cE.Fields),
+	}
+
+	// Add opts to finalOpts.
+	finalOpts = append(finalOpts, opts...)
+
+	return NewRequiredError(message, finalOpts...)
+}
+
+// NewHTTPError is the building block for simple HTTP errors, e.g.: Not Found.
+func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
+	finalOpts := []Option{
+		WithTag(cE.Tags...),
+		WithField(cE.Fields),
+	}
+
+	// Add opts to finalOpts.
+	finalOpts = append(finalOpts, opts...)
+
+	return NewHTTPError(statusCode, finalOpts...)
+}
+
+// NewChildError creates a new `CustomError` with the same fields and tags of
+// the parent `CustomError` plus the new fields and tags passed as arguments.
+func (cE *CustomError) NewChildError(fields map[string]interface{}, tags ...string) *CustomError {
+	childCE := &CustomError{
+		Fields: cE.Fields,
+		Tags:   cE.Tags,
+	}
+
+	// Merge the fields to cE.Fields.
+	for k, v := range fields {
+		childCE.Fields[k] = v
+	}
+
+	// Merge the tags to cE.Tags.
+	childCE.Tags = append(childCE.Tags, tags...)
+
+	// Remove duplicates.
+	childCE.Tags = dedupTags(childCE.Tags)
+
+	return childCE
+}
+
 //////
 // Factory.
 //////
@@ -204,4 +318,18 @@ func New(message string, opts ...Option) error {
 	}
 
 	return cE
+}
+
+// NewFactory returns a new custom error with pre-defined fields and tags. It
+// can then be used to generate other custom errors such as:
+// - `NewFailedToError`
+// - `NewInvalidError`
+// - `NewMissingError`
+// - `NewRequiredError`
+// - `NewHTTPError`
+func NewFactory(fields map[string]interface{}, tags ...string) *CustomError {
+	return &CustomError{
+		Fields: fields,
+		Tags:   tags,
+	}
 }

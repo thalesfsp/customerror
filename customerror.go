@@ -147,14 +147,16 @@ func (cE *CustomError) Unwrap() error {
 // Is interface implementation ensures chain continuity. Treats `CustomError` as
 // equivalent to `err`.
 //
-
+// SEE https://blog.golang.org/go1.13-errors
+//
+//nolint:errorlint
 func (cE *CustomError) Is(err error) bool {
 	return cE.Err == err
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 //
-// See: https://gist.github.com/thalesfsp/3a1252530750e2370345a2418721ff54
+// SEE https://gist.github.com/thalesfsp/3a1252530750e2370345a2418721ff54
 func (cE *CustomError) MarshalJSON() ([]byte, error) {
 	type Alias CustomError
 

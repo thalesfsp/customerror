@@ -22,6 +22,7 @@ linters:
     - tagliatelle
     - goerr113
     - varnamelen
+    - errorlint
   fast: false
 
 # Settings for specific linters

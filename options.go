@@ -13,7 +13,10 @@
 
 package customerror
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
 // Option allows to define error options.
 type Option func(s *CustomError)
@@ -85,9 +88,24 @@ func WithTag(tag ...string) Option {
 	}
 }
 
-// WithField allows to specify fields for the error.
-func WithField(fields map[string]interface{}) Option {
+// WithFields allows to set fields for the error.
+func WithFields(fields map[string]interface{}) Option {
 	return func(cE *CustomError) {
-		cE.Fields = fields
+		if cE.Fields == nil {
+			cE.Fields = &sync.Map{}
+		}
+
+		cE.Fields = mapToSyncMap(fields)
+	}
+}
+
+// WithField allows to set a field for the error.
+func WithField(key string, value any) Option {
+	return func(cE *CustomError) {
+		if cE.Fields == nil {
+			cE.Fields = &sync.Map{}
+		}
+
+		cE.Fields.Store(key, value)
 	}
 }

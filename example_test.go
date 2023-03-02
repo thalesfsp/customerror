@@ -205,10 +205,13 @@ func ExampleNew_optionsWithTag() {
 //
 //nolint:errorlint,forcetypeassert
 func ExampleNew_optionsWithFields() {
-	fmt.Println(NewMissingError(
+	// Store message in a buf to be checked later.
+	var buf strings.Builder
+
+	fmt.Fprintln(&buf, NewMissingError(
 		"id",
 		WithTag("test1", "test2"),
-		WithField(map[string]interface{}{
+		WithFields(map[string]interface{}{
 			"testKey1": "testValue1",
 			"testKey2": "testValue2",
 		}),
@@ -217,10 +220,10 @@ func ExampleNew_optionsWithFields() {
 		WithError(errors.New("some error")),
 	))
 
-	fmt.Println(NewMissingError(
+	fmt.Fprintln(&buf, NewMissingError(
 		"id",
 		WithTag("test1", "test2"),
-		WithField(map[string]interface{}{
+		WithFields(map[string]interface{}{
 			"testKey1": "testValue1",
 			"testKey2": "testValue2",
 		}),
@@ -229,9 +232,61 @@ func ExampleNew_optionsWithFields() {
 		WithError(errors.New("some error")),
 	).(*CustomError).APIError())
 
+	fmt.Println(len(checkIfStringContainsMany(
+		buf.String(),
+		"E1010: missing id",
+		"E1010: missing id (406 - Not Acceptable)",
+		"Original Error: some error",
+		"Tags: test1, test2",
+		"Fields:",
+		"testKey1=testValue1",
+		"testKey2=testValue2",
+	)) == 0)
+
 	// output:
-	// E1010: missing id. Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
-	// E1010: missing id (406 - Not Acceptable). Original Error: some error. Tags: test1, test2. Fields: testKey1=testValue1, testKey2=testValue2
+	// true
+}
+
+// Demonstrates the WithField option.
+//
+//nolint:errorlint,forcetypeassert
+func ExampleNew_optionsWithField() {
+	// Store message in a buf to be checked later.
+	var buf strings.Builder
+
+	fmt.Fprintln(&buf, NewMissingError(
+		"id",
+		WithTag("test1", "test2"),
+		WithField("testKey1", "testValue1"),
+		WithField("testKey2", "testValue2"),
+		WithCode("E1010"),
+		WithStatusCode(http.StatusNotAcceptable),
+		WithError(errors.New("some error")),
+	))
+
+	fmt.Fprintln(&buf, NewMissingError(
+		"id",
+		WithTag("test1", "test2"),
+		WithField("testKey1", "testValue1"),
+		WithField("testKey2", "testValue2"),
+		WithCode("E1010"),
+		WithStatusCode(http.StatusNotAcceptable),
+		WithError(errors.New("some error")),
+	).(*CustomError).APIError())
+
+	fmt.Println(len(checkIfStringContainsMany(
+		buf.String(),
+		"E1010: missing id",
+		"E1010: missing id (406 - Not Acceptable)",
+		"Original Error: some error",
+		"Tags: test1, test2",
+		"Fields:",
+		"testKey1=testValue1",
+		"testKey2=testValue2",
+	)) == 0)
+
+	// output:
+	// true
 }
 
 // ExampleNew_NewFactory demonstrates the usage of the NewFactory function.

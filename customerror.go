@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -20,18 +21,46 @@ import (
 //////
 
 // Process fields and add them to the error message.
-func processFields(errMsg string, fields map[string]interface{}) string {
+func processFields(errMsg string, fields *sync.Map) string {
 	if fields != nil {
 		errMsg = fmt.Sprintf("%s. Fields:", errMsg)
 
-		for k, v := range fields {
+		fields.Range(func(k, v interface{}) bool {
 			errMsg = fmt.Sprintf("%s %s=%v,", errMsg, k, v)
-		}
+
+			return true
+		})
 
 		errMsg = strings.TrimSuffix(errMsg, ",")
 	}
 
 	return errMsg
+}
+
+// mapToSyncMap converts a map to a sync.Map.
+func mapToSyncMap(m map[string]interface{}) *sync.Map {
+	sm := &sync.Map{}
+
+	for k, v := range m {
+		sm.Store(k, v)
+	}
+
+	return sm
+}
+
+// syncMapToMap converts a sync.Map to a map.
+func syncMapToMap(sm *sync.Map) map[string]interface{} {
+	m := make(map[string]interface{})
+
+	sm.Range(func(k, v interface{}) bool {
+		if str, ok := k.(string); ok {
+			m[str] = v
+		}
+
+		return true
+	})
+
+	return m
 }
 
 // dedupTags removes duplicate tags.
@@ -62,7 +91,7 @@ type CustomError struct {
 	Err error `json:"-"`
 
 	// Field enhances the error message with more structured information.
-	Fields map[string]interface{} `json:"fields,omitempty"`
+	Fields *sync.Map `json:"fields,omitempty"`
 
 	// Human readable message. Minimum length: 3.
 	Message string `json:"message" validate:"required,gte=3"`
@@ -191,7 +220,7 @@ func Wrap(customError error, errors ...error) error {
 func (cE *CustomError) NewFailedToError(message string, opts ...Option) error {
 	finalOpts := []Option{
 		WithTag(cE.Tags...),
-		WithField(cE.Fields),
+		WithFields(syncMapToMap(cE.Fields)),
 	}
 
 	// Add opts to finalOpts.
@@ -207,7 +236,7 @@ func (cE *CustomError) NewFailedToError(message string, opts ...Option) error {
 func (cE *CustomError) NewInvalidError(message string, opts ...Option) error {
 	finalOpts := []Option{
 		WithTag(cE.Tags...),
-		WithField(cE.Fields),
+		WithFields(syncMapToMap(cE.Fields)),
 	}
 
 	// Add opts to finalOpts.
@@ -223,7 +252,7 @@ func (cE *CustomError) NewInvalidError(message string, opts ...Option) error {
 func (cE *CustomError) NewMissingError(message string, opts ...Option) error {
 	finalOpts := []Option{
 		WithTag(cE.Tags...),
-		WithField(cE.Fields),
+		WithFields(syncMapToMap(cE.Fields)),
 	}
 
 	// Add opts to finalOpts.
@@ -239,7 +268,7 @@ func (cE *CustomError) NewMissingError(message string, opts ...Option) error {
 func (cE *CustomError) NewRequiredError(message string, opts ...Option) error {
 	finalOpts := []Option{
 		WithTag(cE.Tags...),
-		WithField(cE.Fields),
+		WithFields(syncMapToMap(cE.Fields)),
 	}
 
 	// Add opts to finalOpts.
@@ -252,7 +281,7 @@ func (cE *CustomError) NewRequiredError(message string, opts ...Option) error {
 func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
 	finalOpts := []Option{
 		WithTag(cE.Tags...),
-		WithField(cE.Fields),
+		WithFields(syncMapToMap(cE.Fields)),
 	}
 
 	// Add opts to finalOpts.
@@ -271,7 +300,7 @@ func (cE *CustomError) NewChildError(fields map[string]interface{}, tags ...stri
 
 	// Merge the fields to cE.Fields.
 	for k, v := range fields {
-		childCE.Fields[k] = v
+		childCE.Fields.Store(k, v)
 	}
 
 	// Merge the tags to cE.Tags.
@@ -333,7 +362,7 @@ func New(message string, opts ...Option) error {
 // - `NewHTTPError`.
 func NewFactory(fields map[string]interface{}, tags ...string) *CustomError {
 	return &CustomError{
-		Fields: fields,
+		Fields: mapToSyncMap(fields),
 		Tags:   tags,
 	}
 }

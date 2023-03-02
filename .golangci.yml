@@ -58,6 +58,7 @@ issues:
         - dupl
         - gocognit
         - nosnakecase
+        - lll
 
     - path: doc.go
       linters:

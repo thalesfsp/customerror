@@ -5,11 +5,15 @@
 package customerror
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -345,4 +349,25 @@ func TestNew_InvalidCustomError(t *testing.T) {
 	}()
 
 	_ = New("")
+}
+
+func Test_CustomError_MarshalJSON(t *testing.T) {
+	fields := sync.Map{}
+	fields.Store("field1", "value1")
+	fields.Store("field2", 2)
+	cE := &CustomError{
+		Code:       "E1010",
+		Err:        errors.New("Some error"),
+		Fields:     &fields,
+		Message:    "An error occurred",
+		StatusCode: http.StatusBadRequest,
+		Tags:       []string{"tag1", "tag2"},
+		ignore:     false,
+	}
+
+	b, err := json.Marshal(cE)
+	assert.NoError(t, err)
+
+	expected := `{"code":"E1010","field1":"value1","field2":2,"message":"An error occurred. Original Error: Some error","tags":["tag1","tag2"]}`
+	assert.Equal(t, expected, string(b))
 }

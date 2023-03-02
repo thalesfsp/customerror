@@ -52,13 +52,15 @@ func mapToSyncMap(m map[string]interface{}) *sync.Map {
 func syncMapToMap(sm *sync.Map) map[string]interface{} {
 	m := make(map[string]interface{})
 
-	sm.Range(func(k, v interface{}) bool {
-		if str, ok := k.(string); ok {
-			m[str] = v
-		}
+	if sm != nil {
+		sm.Range(func(k, v interface{}) bool {
+			if str, ok := k.(string); ok {
+				m[str] = v
+			}
 
-		return true
-	})
+			return true
+		})
+	}
 
 	return m
 }
@@ -109,6 +111,17 @@ type CustomError struct {
 //////
 // Error interface implementation.
 //////
+
+// JustError returns the error message without any additional information.
+func (cE *CustomError) JustError() string {
+	errMsg := cE.Message
+
+	if cE.Err != nil {
+		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
+	}
+
+	return errMsg
+}
 
 // Error interface implementation returns the properly formatted error message.
 func (cE *CustomError) Error() string {
@@ -187,17 +200,26 @@ func (cE *CustomError) Is(err error) bool {
 //
 // SEE https://gist.github.com/thalesfsp/3a1252530750e2370345a2418721ff54
 func (cE *CustomError) MarshalJSON() ([]byte, error) {
-	type Alias CustomError
+	// Define a temporary map that matches the desired JSON format.
+	temp := make(map[string]interface{})
 
-	b := &struct {
-		*Alias
-	}{
-		Alias: (*Alias)(cE),
+	// Populate the temporary map.
+	temp["code"] = cE.Code
+	temp["message"] = cE.JustError()
+	temp["tags"] = cE.Tags
+
+	// Convert the sync.Map to a regular map so that we can iterate over its keys.
+	fields := syncMapToMap(cE.Fields)
+
+	// Populate the fields of the temporary map.
+	if len(fields) > 0 {
+		for k, v := range fields {
+			temp[k] = v
+		}
 	}
 
-	b.Message = cE.Error()
-
-	return json.Marshal(b)
+	// Serialize the temporary map to JSON.
+	return json.Marshal(temp)
 }
 
 // Wrap `customError` around `errors`.

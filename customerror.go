@@ -204,17 +204,27 @@ func (cE *CustomError) MarshalJSON() ([]byte, error) {
 	temp := make(map[string]interface{})
 
 	// Populate the temporary map.
-	temp["code"] = cE.Code
 	temp["message"] = cE.JustError()
-	temp["tags"] = cE.Tags
 
-	// Convert the sync.Map to a regular map so that we can iterate over its keys.
-	fields := syncMapToMap(cE.Fields)
+	if cE.Code != "" {
+		temp["code"] = cE.Code
+	}
 
-	// Populate the fields of the temporary map.
-	if len(fields) > 0 {
-		for k, v := range fields {
-			temp[k] = v
+	if cE.Tags != nil && len(cE.Tags) > 0 {
+		temp["tags"] = cE.Tags
+	}
+
+	if cE.Fields != nil {
+		// Convert the sync.Map to a regular map so that we can iterate over its keys.
+		fields := syncMapToMap(cE.Fields)
+
+		// Populate the fields of the temporary map.
+		if len(fields) > 0 {
+			for k, v := range fields {
+				if k != "" && v != nil {
+					temp[k] = v
+				}
+			}
 		}
 	}
 

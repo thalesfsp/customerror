@@ -355,19 +355,39 @@ func Test_CustomError_MarshalJSON(t *testing.T) {
 	fields := sync.Map{}
 	fields.Store("field1", "value1")
 	fields.Store("field2", 2)
-	cE := &CustomError{
-		Code:       "E1010",
-		Err:        errors.New("Some error"),
-		Fields:     &fields,
-		Message:    "An error occurred",
-		StatusCode: http.StatusBadRequest,
-		Tags:       []string{"tag1", "tag2"},
-		ignore:     false,
+
+	tests := []struct {
+		name     string
+		cE       *CustomError
+		expected string
+	}{
+		{
+			name: "with all fields",
+			cE: &CustomError{
+				Code:       "E1010",
+				Err:        errors.New("Some error"),
+				Fields:     &fields,
+				Message:    "An error occurred",
+				StatusCode: http.StatusBadRequest,
+				Tags:       []string{"tag1", "tag2"},
+				ignore:     false,
+			},
+			expected: `{"code":"E1010","field1":"value1","field2":2,"message":"An error occurred. Original Error: Some error","tags":["tag1","tag2"]}`,
+		},
+		{
+			name: "with message only",
+			cE: &CustomError{
+				Message: "An error occurred",
+			},
+			expected: `{"message":"An error occurred"}`,
+		},
 	}
 
-	b, err := json.Marshal(cE)
-	assert.NoError(t, err)
-
-	expected := `{"code":"E1010","field1":"value1","field2":2,"message":"An error occurred. Original Error: Some error","tags":["tag1","tag2"]}`
-	assert.Equal(t, expected, string(b))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := json.Marshal(tt.cE)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, string(b))
+		})
+	}
 }

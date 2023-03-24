@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -369,7 +370,7 @@ func Test_CustomError_MarshalJSON(t *testing.T) {
 				Fields:     &fields,
 				Message:    "An error occurred",
 				StatusCode: http.StatusBadRequest,
-				Tags:       []string{"tag1", "tag2"},
+				Tags:       &Set{treeset.NewWithStringComparator("tag1", "tag2")},
 				ignore:     false,
 			},
 			expected: `{"code":"E1010","field1":"value1","field2":2,"message":"An error occurred. Original Error: Some error","tags":["tag1","tag2"]}`,

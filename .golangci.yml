@@ -23,6 +23,7 @@ linters:
     - goerr113
     - varnamelen
     - errorlint
+    - forcetypeassert
   fast: false
 
 # Settings for specific linters
@@ -43,6 +44,7 @@ issues:
     - path: example_test.go
       linters:
         - lll
+        - dupword
 
     - path: internal/http/
       linters:
@@ -67,6 +69,10 @@ issues:
     - linters:
         - lll
       source: "json:"
+
+    - linters:
+        - lll
+      source: "Err"
 
     - linters:
         - gocritic

@@ -13,12 +13,95 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/go-playground/validator/v10"
 )
 
 //////
 // Helpers.
 //////
+
+// Copy src to target.
+func Copy(src, target *CustomError) *CustomError {
+	if src.Code != "" {
+		target.Code = src.Code
+	}
+
+	if src.Err != nil {
+		target.Err = src.Err
+	}
+
+	if src.Message != "" {
+		target.Message = src.Message
+	}
+
+	if src.StatusCode != 0 {
+		target.StatusCode = src.StatusCode
+	}
+
+	if src.ignore {
+		target.ignore = src.ignore
+	}
+
+	// Merge the language messages.
+	if src.LanguageMessageMap != nil {
+		if target.LanguageMessageMap == nil {
+			target.LanguageMessageMap = &sync.Map{}
+		}
+
+		finalLanguageMessageMap := &sync.Map{}
+
+		src.LanguageMessageMap.Range(func(key, value interface{}) bool {
+			finalLanguageMessageMap.Store(key, value)
+
+			return true
+		})
+
+		target.LanguageMessageMap.Range(func(key, value interface{}) bool {
+			finalLanguageMessageMap.Store(key, value)
+
+			return true
+		})
+
+		target.LanguageMessageMap = finalLanguageMessageMap
+	}
+
+	// Merge fields.
+	if src.Fields != nil {
+		if target.Fields == nil {
+			target.Fields = &sync.Map{}
+		}
+
+		finalFields := &sync.Map{}
+
+		src.Fields.Range(func(key, value interface{}) bool {
+			finalFields.Store(key, value)
+
+			return true
+		})
+
+		target.Fields.Range(func(key, value interface{}) bool {
+			finalFields.Store(key, value)
+
+			return true
+		})
+
+		target.Fields = finalFields
+	}
+
+	// Merge the tags.
+	if src.Tags != nil {
+		if target.Tags == nil {
+			target.Tags = &Set{treeset.NewWithStringComparator()}
+		}
+
+		src.Tags.Each(func(index int, value interface{}) {
+			target.Tags.Add(value)
+		})
+	}
+
+	return target
+}
 
 // Process fields and add them to the error message.
 func processFields(errMsg string, fields *sync.Map) string {
@@ -65,21 +148,20 @@ func syncMapToMap(sm *sync.Map) map[string]interface{} {
 	return m
 }
 
-// dedupTags removes duplicate tags.
-func dedupTags(tags []string) []string {
-	keys := make(map[string]bool)
+// Set is a wrapper around the treeset.Set.
+type Set struct {
+	*treeset.Set
+}
 
-	list := []string{}
+// Implement Stringer interface.
+func (s *Set) String() string {
+	items := []string{}
 
-	for _, entry := range tags {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
+	s.Each(func(index int, value interface{}) {
+		items = append(items, fmt.Sprintf("%v", value))
+	})
 
-			list = append(list, entry)
-		}
-	}
-
-	return list
+	return strings.Join(items, ", ")
 }
 
 // CustomError is the base block to create custom errors. It provides context -
@@ -87,7 +169,7 @@ func dedupTags(tags []string) []string {
 // and `StatusCode` can be provided.
 type CustomError struct {
 	// Code can be any custom code, e.g.: E1010.
-	Code string `json:"code,omitempty" validate:"omitempty,startswith=E,gte=2"`
+	Code string `json:"code,omitempty" validate:"omitempty,gte=2"`
 
 	// Err optionally wraps the original error.
 	Err error `json:"-"`
@@ -98,11 +180,14 @@ type CustomError struct {
 	// Human readable message. Minimum length: 3.
 	Message string `json:"message" validate:"required,gte=3"`
 
+	// Message in different languages.
+	LanguageMessageMap LanguageMessageMap `json:"messages,omitempty"`
+
 	// StatusCode is a valid HTTP status code, e.g.: 404.
 	StatusCode int `json:"-" validate:"omitempty,gte=100,lte=511"`
 
-	// Tags is a list of tags which helps to categorize the error.
-	Tags []string `json:"tags,omitempty"`
+	// Tags is a SET of tags which helps to categorize the error.
+	Tags *Set `json:"tags,omitempty"`
 
 	// If set to true, the error will be ignored (return nil).
 	ignore bool `json:"-"`
@@ -112,18 +197,8 @@ type CustomError struct {
 // Error interface implementation.
 //////
 
-// JustError returns the error message without any additional information.
-func (cE *CustomError) JustError() string {
-	errMsg := cE.Message
-
-	if cE.Err != nil {
-		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
-	}
-
-	return errMsg
-}
-
 // Error interface implementation returns the properly formatted error message.
+// It will contain `Code`, `Tags`, `Fields` and any wrapped error.
 func (cE *CustomError) Error() string {
 	errMsg := cE.Message
 
@@ -140,10 +215,80 @@ func (cE *CustomError) Error() string {
 	}
 
 	if cE.Tags != nil {
-		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, strings.Join(cE.Tags, ", "))
+		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, cE.Tags.String())
 	}
 
 	errMsg = processFields(errMsg, cE.Fields)
+
+	return errMsg
+}
+
+// Is interface implementation ensures chain continuity. Treats `CustomError` as
+// equivalent to `err`.
+//
+// SEE https://blog.golang.org/go1.13-errors
+//
+//nolint:errorlint
+func (cE *CustomError) Is(err error) bool {
+	return cE.Err == err
+}
+
+// Unwrap interface implementation returns inner error.
+func (cE *CustomError) Unwrap() error {
+	return cE.Err
+}
+
+//////
+// Implementing the json.Marshaler interface.
+//////
+
+// MarshalJSON implements the json.Marshaler interface.
+//
+// SEE https://gist.github.com/thalesfsp/3a1252530750e2370345a2418721ff54
+func (cE *CustomError) MarshalJSON() ([]byte, error) {
+	// Define a temporary map that matches the desired JSON format.
+	temp := make(map[string]interface{})
+
+	// Populate the temporary map.
+	temp["message"] = cE.JustError()
+
+	if cE.Code != "" {
+		temp["code"] = cE.Code
+	}
+
+	if cE.Tags != nil && !cE.Tags.Empty() {
+		temp["tags"] = cE.Tags
+	}
+
+	if cE.Fields != nil {
+		// Convert the sync.Map to a regular map so that we can iterate over its keys.
+		fields := syncMapToMap(cE.Fields)
+
+		// Populate the fields of the temporary map.
+		if len(fields) > 0 {
+			for k, v := range fields {
+				if k != "" && v != nil {
+					temp[k] = v
+				}
+			}
+		}
+	}
+
+	// Serialize the temporary map to JSON.
+	return json.Marshal(temp)
+}
+
+//////
+// Error message formatting.
+//////
+
+// JustError returns the error message without any additional information.
+func (cE *CustomError) JustError() string {
+	errMsg := cE.Message
+
+	if cE.Err != nil {
+		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
+	}
 
 	return errMsg
 }
@@ -173,7 +318,7 @@ func (cE *CustomError) APIError() string {
 	}
 
 	if cE.Tags != nil {
-		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, strings.Join(cE.Tags, ", "))
+		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, cE.Tags.String())
 	}
 
 	errMsg = processFields(errMsg, cE.Fields)
@@ -181,56 +326,167 @@ func (cE *CustomError) APIError() string {
 	return errMsg
 }
 
-// Unwrap interface implementation returns inner error.
-func (cE *CustomError) Unwrap() error {
-	return cE.Err
-}
+//////
+// Factory methods.
+//////
 
-// Is interface implementation ensures chain continuity. Treats `CustomError` as
-// equivalent to `err`.
+// NewFailedToError is the building block for errors usually thrown when some
+// action failed, e.g: "Failed to create host". Default status code is `500`.
 //
-// SEE https://blog.golang.org/go1.13-errors
+// NOTE: Preferably don't use with the `WithLanguage` because of the "Failed to"
+// part. Prefer to use `New` instead.
 //
-//nolint:errorlint
-func (cE *CustomError) Is(err error) bool {
-	return cE.Err == err
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-//
-// SEE https://gist.github.com/thalesfsp/3a1252530750e2370345a2418721ff54
-func (cE *CustomError) MarshalJSON() ([]byte, error) {
-	// Define a temporary map that matches the desired JSON format.
-	temp := make(map[string]interface{})
-
-	// Populate the temporary map.
-	temp["message"] = cE.JustError()
-
-	if cE.Code != "" {
-		temp["code"] = cE.Code
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewFailedToError(opts ...Option) error {
+	if cE == nil {
+		return nil
 	}
 
-	if cE.Tags != nil && len(cE.Tags) > 0 {
-		temp["tags"] = cE.Tags
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
 	}
 
-	if cE.Fields != nil {
-		// Convert the sync.Map to a regular map so that we can iterate over its keys.
-		fields := syncMapToMap(cE.Fields)
+	finalCE = Copy(NewFailedToError(finalCE.Message, opts...).(*CustomError), finalCE)
 
-		// Populate the fields of the temporary map.
-		if len(fields) > 0 {
-			for k, v := range fields {
-				if k != "" && v != nil {
-					temp[k] = v
-				}
-			}
-		}
-	}
-
-	// Serialize the temporary map to JSON.
-	return json.Marshal(temp)
+	return finalCE
 }
+
+// NewInvalidError is the building block for errors usually thrown when
+// something fail validation, e.g: "Invalid port". Default status code is `400`.
+//
+// NOTE: Preferably don't use with the `WithLanguage` because of the "Invalid"
+// part. Prefer to use `New` instead.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewInvalidError(opts ...Option) error {
+	if cE == nil {
+		return nil
+	}
+
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
+	}
+
+	finalCE = Copy(NewInvalidError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+	return finalCE
+}
+
+// NewMissingError is the building block for errors usually thrown when required
+// information is missing, e.g: "Missing host". Default status code is `400`.
+//
+// NOTE: Preferably don't use with the `WithLanguage` because of the "Missing"
+// part. Prefer to use `New` instead.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewMissingError(opts ...Option) error {
+	if cE == nil {
+		return nil
+	}
+
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
+	}
+
+	finalCE = Copy(NewMissingError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+	return finalCE
+}
+
+// NewRequiredError is the building block for errors usually thrown when
+// required information is missing, e.g: "Port is required". Default status code is `400`.
+//
+// NOTE: Preferably don't use with the `WithLanguage` because of the "Required"
+// part. Prefer to use `New` instead.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewRequiredError(opts ...Option) error {
+	if cE == nil {
+		return nil
+	}
+
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
+	}
+
+	finalCE = Copy(NewRequiredError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+	return finalCE
+}
+
+// NewHTTPError is the building block for simple HTTP errors, e.g.: Not Found.
+//
+// NOTE: Preferably don't use with the `WithLanguage` because of it's just a
+// simple HTTP error. Prefer to use `New` instead.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
+	if cE == nil {
+		return nil
+	}
+
+	if cE.StatusCode == 0 {
+		cE.StatusCode = statusCode
+	}
+
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
+	}
+
+	finalCE = Copy(NewHTTPError(finalCE.StatusCode, opts...).(*CustomError), finalCE)
+
+	return finalCE
+}
+
+// New is the building block for other errors. Preferred method to be used for
+// translations (WithLanguage).
+func (cE *CustomError) New(opts ...Option) error {
+	if cE == nil {
+		return nil
+	}
+
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
+	}
+
+	finalCE = Copy(New(finalCE.Message, opts...).(*CustomError), finalCE)
+
+	return finalCE
+}
+
+//////
+// Exported functionalities.
+//////
 
 // Wrap `customError` around `errors`.
 func Wrap(customError error, errors ...error) error {
@@ -245,116 +501,35 @@ func Wrap(customError error, errors ...error) error {
 	return fmt.Errorf("%w. Wrapped Error(s): %s", customError, strings.Join(errMsgs, ". "))
 }
 
-// NewFailedToError is the building block for errors usually thrown when some
-// action failed, e.g: "Failed to create host". Default status code is `500`.
-//
-// NOTE: Status code can be redefined, call `SetStatusCode`.
-func (cE *CustomError) NewFailedToError(message string, opts ...Option) error {
-	finalOpts := []Option{
-		WithTag(cE.Tags...),
-		WithFields(syncMapToMap(cE.Fields)),
-	}
-
-	// Add opts to finalOpts.
-	finalOpts = append(finalOpts, opts...)
-
-	return NewFailedToError(message, finalOpts...)
-}
-
-// NewInvalidError is the building block for errors usually thrown when
-// something fail validation, e.g: "Invalid port". Default status code is `400`.
-//
-// NOTE: Status code can be redefined, call `SetStatusCode`.
-func (cE *CustomError) NewInvalidError(message string, opts ...Option) error {
-	finalOpts := []Option{
-		WithTag(cE.Tags...),
-		WithFields(syncMapToMap(cE.Fields)),
-	}
-
-	// Add opts to finalOpts.
-	finalOpts = append(finalOpts, opts...)
-
-	return NewInvalidError(message, finalOpts...)
-}
-
-// NewMissingError is the building block for errors usually thrown when required
-// information is missing, e.g: "Missing host". Default status code is `400`.
-//
-// NOTE: Status code can be redefined, call `SetStatusCode`.
-func (cE *CustomError) NewMissingError(message string, opts ...Option) error {
-	finalOpts := []Option{
-		WithTag(cE.Tags...),
-		WithFields(syncMapToMap(cE.Fields)),
-	}
-
-	// Add opts to finalOpts.
-	finalOpts = append(finalOpts, opts...)
-
-	return NewMissingError(message, finalOpts...)
-}
-
-// NewRequiredError is the building block for errors usually thrown when
-// required information is missing, e.g: "Port is required". Default status code is `400`.
-//
-// NOTE: Status code can be redefined, call `SetStatusCode`.
-func (cE *CustomError) NewRequiredError(message string, opts ...Option) error {
-	finalOpts := []Option{
-		WithTag(cE.Tags...),
-		WithFields(syncMapToMap(cE.Fields)),
-	}
-
-	// Add opts to finalOpts.
-	finalOpts = append(finalOpts, opts...)
-
-	return NewRequiredError(message, finalOpts...)
-}
-
-// NewHTTPError is the building block for simple HTTP errors, e.g.: Not Found.
-func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
-	finalOpts := []Option{
-		WithTag(cE.Tags...),
-		WithFields(syncMapToMap(cE.Fields)),
-	}
-
-	// Add opts to finalOpts.
-	finalOpts = append(finalOpts, opts...)
-
-	return NewHTTPError(statusCode, finalOpts...)
-}
-
 // NewChildError creates a new `CustomError` with the same fields and tags of
 // the parent `CustomError` plus the new fields and tags passed as arguments.
-func (cE *CustomError) NewChildError(fields map[string]interface{}, tags ...string) *CustomError {
-	childCE := &CustomError{
-		Fields: cE.Fields,
-		Tags:   cE.Tags,
+func (cE *CustomError) NewChildError(opts ...Option) *CustomError {
+	childCE := &CustomError{}
+
+	// Apply the options.
+	for _, opt := range opts {
+		opt(childCE)
 	}
 
-	// Merge the fields to cE.Fields.
-	for k, v := range fields {
-		childCE.Fields.Store(k, v)
-	}
+	return Copy(cE, childCE)
+}
 
-	// Merge the tags to cE.Tags.
-	childCE.Tags = append(childCE.Tags, tags...)
-
-	// Remove duplicates.
-	childCE.Tags = dedupTags(childCE.Tags)
-
-	return childCE
+// SetMessage sets the message of the error.
+func (cE *CustomError) SetMessage(message string) {
+	cE.Message = message
 }
 
 //////
 // Factory.
 //////
 
-// New is the custom error factory.
-func New(message string, opts ...Option) error {
-	cE := &CustomError{
-		Message: message,
-		ignore:  false,
-	}
+// Base new.
+//
+//nolint:predeclared
+func new(opts ...Option) *CustomError {
+	cE := &CustomError{}
 
+	// Apply options.
 	for _, opt := range opts {
 		opt(cE)
 	}
@@ -372,6 +547,17 @@ func New(message string, opts ...Option) error {
 		return nil
 	}
 
+	return cE
+}
+
+// New creates a new validated custom error returning it as en `error`.
+func New(message string, opts ...Option) error {
+	cE := new(prependOptions(opts, WithMessage(message))...)
+
+	if cE == nil {
+		return nil
+	}
+
 	if err := validator.New().Struct(cE); err != nil {
 		if os.Getenv("CUSTOMERROR_ENVIRONMENT") == "testing" {
 			log.Panicf("Invalid custom error. %s\n", err)
@@ -385,16 +571,13 @@ func New(message string, opts ...Option) error {
 	return cE
 }
 
-// NewFactory returns a new custom error with pre-defined fields and tags. It
-// can then be used to generate other custom errors such as:
+// Factory creates a validated and pre-defined error to be recalled and thrown
+// later, with or without options. Possible options are:
 // - `NewFailedToError`
 // - `NewInvalidError`
 // - `NewMissingError`
 // - `NewRequiredError`
 // - `NewHTTPError`.
-func NewFactory(fields map[string]interface{}, tags ...string) *CustomError {
-	return &CustomError{
-		Fields: mapToSyncMap(fields),
-		Tags:   tags,
-	}
+func Factory(message string, opts ...Option) *CustomError {
+	return new(prependOptions(opts, WithMessage(message))...)
 }

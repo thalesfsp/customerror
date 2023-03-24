@@ -16,7 +16,13 @@ package customerror
 import (
 	"strings"
 	"sync"
+
+	"github.com/emirpasic/gods/sets/treeset"
 )
+
+//////
+// Consts, vars, and types.
+//////
 
 // Option allows to define error options.
 type Option func(s *CustomError)
@@ -32,11 +38,22 @@ func prependOptions(source []Option, item Option) []Option {
 	return source
 }
 
+//////
+// Built-in options.
+//////
+
 // WithError allows to specify an error which will be wrapped by the custom
 // error.
 func WithError(err error) Option {
 	return func(cE *CustomError) {
 		cE.Err = err
+	}
+}
+
+// WithMessage allows to specify the error message.
+func WithMessage(msg string) Option {
+	return func(cE *CustomError) {
+		cE.Message = msg
 	}
 }
 
@@ -65,6 +82,8 @@ func WithIgnoreFunc(f func(cE *CustomError) bool) Option {
 
 // WithIgnoreString ignores an error if the error message, or the the underlying
 // error message contains the specified string.
+//
+//nolint:dupword
 func WithIgnoreString(s ...string) Option {
 	return WithIgnoreFunc(func(cE *CustomError) bool {
 		for _, str := range s {
@@ -84,7 +103,13 @@ func WithIgnoreString(s ...string) Option {
 // WithTag allows to specify tags for the error.
 func WithTag(tag ...string) Option {
 	return func(cE *CustomError) {
-		cE.Tags = tag
+		if cE.Tags == nil {
+			cE.Tags = &Set{treeset.NewWithStringComparator()}
+		}
+
+		for _, t := range tag {
+			cE.Tags.Add(t)
+		}
 	}
 }
 
@@ -107,5 +132,42 @@ func WithField(key string, value any) Option {
 		}
 
 		cE.Fields.Store(key, value)
+	}
+}
+
+// WithLanguage specifies the language for the error message.
+// It requires `lang` to be a valid ISO 639-1 and ISO 3166-1 alpha-2 standard,
+// and the `LanguageMessageMap` map to be set, otherwise it will be ignored
+// returning the default message.
+func WithLanguage(lang string) Option {
+	return func(cE *CustomError) {
+		l, err := NewLanguage(lang)
+		if err != nil {
+			panic(err)
+		}
+
+		if cE.LanguageMessageMap == nil {
+			cE.LanguageMessageMap = &sync.Map{}
+		}
+
+		if msg, ok := cE.LanguageMessageMap.Load(l); ok {
+			cE.SetMessage(msg.(string))
+		}
+	}
+}
+
+// WithTranslation sets translations for the error message.
+func WithTranslation(lang, message string) Option {
+	return func(cE *CustomError) {
+		if cE.LanguageMessageMap == nil {
+			cE.LanguageMessageMap = &sync.Map{}
+		}
+
+		l, err := NewLanguage(lang)
+		if err != nil {
+			panic(err)
+		}
+
+		cE.LanguageMessageMap.Store(l, message)
 	}
 }

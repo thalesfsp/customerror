@@ -291,40 +291,46 @@ func ExampleNew_optionsWithField() {
 
 // ExampleNew_NewFactory demonstrates the usage of the NewFactory function.
 func ExampleNew_newFactory() {
-	factory := NewFactory(
-		map[string]interface{}{
+	factory := Factory(
+		"id",
+		WithFields(map[string]interface{}{
 			"test1": "test2",
 			"test3": "test4",
-		},
-		"testTag1", "testTag2", "testTag3",
+		}),
+		WithTag("testTag1", "testTag2", "testTag3"),
 	)
 
 	childFactory := factory.NewChildError(
-		map[string]interface{}{
+		WithFields(map[string]interface{}{
 			"test1": "test2",
 			"test5": "test6",
-		},
-		"testTag2", "testTag3", "testTag4",
+		}),
+		WithTag("testTag2", "testTag3", "testTag4"),
 	)
 
 	// Write to a buffer and check the output.
 	var buf bytes.Buffer
 
-	fmt.Fprint(&buf, childFactory.NewMissingError("id"))
-	fmt.Fprint(&buf, childFactory.NewFailedToError("insert id"))
-	fmt.Fprint(&buf, childFactory.NewInvalidError("id"))
-	fmt.Fprint(&buf, childFactory.NewMissingError("id"))
-	fmt.Fprint(&buf, childFactory.NewRequiredError("id"))
+	fmt.Fprint(&buf, childFactory.NewMissingError())
+	fmt.Fprint(&buf, childFactory.NewFailedToError())
+	fmt.Fprint(&buf, childFactory.NewInvalidError())
+	fmt.Fprint(&buf, childFactory.NewRequiredError())
 	fmt.Fprint(&buf, childFactory.NewHTTPError(400))
 
 	finalMessage := buf.String()
 
-	fmt.Println(len(checkIfStringContainsMany(
+	missing := checkIfStringContainsMany(
 		finalMessage,
-		"missing id", "failed to insert id", "invalid id", "missing id", "id required", "bad request",
+		"missing id", "failed to id", "invalid id", "missing id", "id required", "bad request",
 		"Tags:", "Fields:", "testTag1", "testTag2", "testTag3", "testTag4",
 		"test1=test2", "test3=test4", "test5=test6",
-	)) == 0)
+	)
+
+	if len(missing) == 0 {
+		fmt.Println(true)
+	} else {
+		fmt.Println(missing)
+	}
 
 	// output:
 	// true

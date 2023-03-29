@@ -2,6 +2,7 @@ package customerror
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 )
 
@@ -34,7 +35,7 @@ func TestNewCatalog(t *testing.T) {
 
 			// Example of adding a new language (pt-BR) to an existing error
 			// code.
-			if err := got.Add("INVALID_REQUEST_BODY", "invalid request body", WithTranslation("pt-BR", "corpo da solicitação inválido")); err != nil {
+			if err := got.Set("INVALID_REQUEST_BODY", "invalid request body", WithTranslation("pt-BR", "corpo da solicitação inválido")); err != nil {
 				t.Errorf("NewCatalog() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
@@ -42,7 +43,7 @@ func TestNewCatalog(t *testing.T) {
 
 			// Example of adding a new language (es-ES) to an existing error
 			// code.
-			if err := got.Add("E1010", "invalid response", WithTranslation("es-ES", "resposta inválida")); err != nil {
+			if err := got.Set("E1010", "invalid response", WithTranslation("es-ES", "resposta inválida")); err != nil {
 				t.Errorf("NewCatalog() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
@@ -80,5 +81,39 @@ func TestNewCatalog(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func TestNewCatalog_2(t *testing.T) {
+	cE := Factory("insert id", WithTranslation("pt-BR", "id"))
+
+	x1 := cE.NewFailedToError(WithLanguage("pt-BR"))
+
+	if x1.Error() != "falhou id" {
+		t.Fatalf("Got %s Expected %s", x1, "falhou id")
+	}
+
+	x2 := cE.NewInvalidError(WithLanguage("pt-BR"))
+
+	if x2.Error() != "id é inválido" {
+		t.Fatalf("Got %s Expected %s", x2, "id é inválido")
+	}
+
+	x3 := cE.NewMissingError(WithLanguage("pt-BR"))
+
+	if x3.Error() != "faltando id" {
+		t.Fatalf("Got %s Expected %s", x3, "faltando id")
+	}
+
+	x4 := cE.NewRequiredError(WithLanguage("pt-BR"))
+
+	if x4.Error() != "id necessário" {
+		t.Fatalf("Got %s Expected %s", x4, "id necessário")
+	}
+
+	x5 := cE.NewHTTPError(http.StatusNoContent, WithLanguage("pt-BR"))
+
+	if x5.Error() != "no content" {
+		t.Fatalf("Got %s Expected %s", x5, "no content")
 	}
 }

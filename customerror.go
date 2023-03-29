@@ -31,6 +31,10 @@ func Copy(src, target *CustomError) *CustomError {
 		target.Err = src.Err
 	}
 
+	if src.language != "" {
+		target.language = src.language
+	}
+
 	if src.Message != "" {
 		target.Message = src.Message
 	}
@@ -181,7 +185,11 @@ type CustomError struct {
 	Message string `json:"message" validate:"required,gte=3"`
 
 	// Message in different languages.
-	LanguageMessageMap LanguageMessageMap `json:"messages,omitempty"`
+	LanguageMessageMap LanguageMessageMap `json:"languageMessageMap"`
+
+	// LanguageErrorTypeMap is a map of language prefixes to templates such
+	// as "missing %s", "%s required", "%s invalid", etc.
+	LanguageErrorTypeMap LanguageErrorMap `json:"languageErrorTypeMap"`
 
 	// StatusCode is a valid HTTP status code, e.g.: 404.
 	StatusCode int `json:"-" validate:"omitempty,gte=100,lte=511"`
@@ -191,6 +199,9 @@ type CustomError struct {
 
 	// If set to true, the error will be ignored (return nil).
 	ignore bool `json:"-"`
+
+	// Language to be use for the message and prefix.
+	language Language
 }
 
 //////
@@ -326,6 +337,39 @@ func (cE *CustomError) APIError() string {
 	return errMsg
 }
 
+func (cE *CustomError) X(errorType string, opts ...Option) *CustomError {
+	if cE == nil {
+		return nil
+	}
+
+	finalCE := &CustomError{}
+
+	finalCE = Copy(cE, finalCE)
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(finalCE)
+	}
+
+	if finalCE.language != "" {
+		template, err := GetTemplate(string(finalCE.language), string(FailedTo))
+		if err != nil {
+			template2, err := GetTemplate(finalCE.language.GetRoot(), errorType)
+			if err != nil {
+				panic(err)
+			}
+
+			template = template2
+		}
+
+		finalCE.Message = fmt.Sprintf(template, finalCE.Message)
+
+		return finalCE
+	}
+
+	return finalCE
+}
+
 //////
 // Factory methods.
 //////
@@ -338,20 +382,13 @@ func (cE *CustomError) APIError() string {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewFailedToError(opts ...Option) error {
-	if cE == nil {
-		return nil
+	finalCE := cE.X(string(FailedTo), opts...)
+
+	if finalCE.language == "" {
+		finalCE = Copy(NewFailedToError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+		return finalCE
 	}
-
-	finalCE := &CustomError{}
-
-	finalCE = Copy(cE, finalCE)
-
-	// Apply options.
-	for _, opt := range opts {
-		opt(finalCE)
-	}
-
-	finalCE = Copy(NewFailedToError(finalCE.Message, opts...).(*CustomError), finalCE)
 
 	return finalCE
 }
@@ -364,20 +401,13 @@ func (cE *CustomError) NewFailedToError(opts ...Option) error {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewInvalidError(opts ...Option) error {
-	if cE == nil {
-		return nil
+	finalCE := cE.X(string(Invalid), opts...)
+
+	if finalCE.language == "" {
+		finalCE = Copy(NewInvalidError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+		return finalCE
 	}
-
-	finalCE := &CustomError{}
-
-	finalCE = Copy(cE, finalCE)
-
-	// Apply options.
-	for _, opt := range opts {
-		opt(finalCE)
-	}
-
-	finalCE = Copy(NewInvalidError(finalCE.Message, opts...).(*CustomError), finalCE)
 
 	return finalCE
 }
@@ -390,20 +420,13 @@ func (cE *CustomError) NewInvalidError(opts ...Option) error {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewMissingError(opts ...Option) error {
-	if cE == nil {
-		return nil
+	finalCE := cE.X(Missing.String(), opts...)
+
+	if finalCE.language == "" {
+		finalCE = Copy(NewMissingError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+		return finalCE
 	}
-
-	finalCE := &CustomError{}
-
-	finalCE = Copy(cE, finalCE)
-
-	// Apply options.
-	for _, opt := range opts {
-		opt(finalCE)
-	}
-
-	finalCE = Copy(NewMissingError(finalCE.Message, opts...).(*CustomError), finalCE)
 
 	return finalCE
 }
@@ -416,28 +439,21 @@ func (cE *CustomError) NewMissingError(opts ...Option) error {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewRequiredError(opts ...Option) error {
-	if cE == nil {
-		return nil
+	finalCE := cE.X(Required.String(), opts...)
+
+	if finalCE.language == "" {
+		finalCE = Copy(NewRequiredError(finalCE.Message, opts...).(*CustomError), finalCE)
+
+		return finalCE
 	}
-
-	finalCE := &CustomError{}
-
-	finalCE = Copy(cE, finalCE)
-
-	// Apply options.
-	for _, opt := range opts {
-		opt(finalCE)
-	}
-
-	finalCE = Copy(NewRequiredError(finalCE.Message, opts...).(*CustomError), finalCE)
 
 	return finalCE
 }
 
 // NewHTTPError is the building block for simple HTTP errors, e.g.: Not Found.
 //
-// NOTE: Preferably don't use with the `WithLanguage` because of it's just a
-// simple HTTP error. Prefer to use `New` instead.
+// NOTE: `WithLanguage` has no effect on it because of it's just a simple HTTP
+// error.
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
@@ -453,12 +469,18 @@ func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
 
 	finalCE = Copy(cE, finalCE)
 
+	httpCE := NewHTTPError(finalCE.StatusCode, opts...).(*CustomError)
+
+	finalErrorMessage := httpCE.Message
+
 	// Apply options.
 	for _, opt := range opts {
 		opt(finalCE)
 	}
 
-	finalCE = Copy(NewHTTPError(finalCE.StatusCode, opts...).(*CustomError), finalCE)
+	finalCE.Message = finalErrorMessage
+
+	finalCE = Copy(httpCE, finalCE)
 
 	return finalCE
 }

@@ -138,7 +138,8 @@ func WithField(key string, value any) Option {
 // WithLanguage specifies the language for the error message.
 // It requires `lang` to be a valid ISO 639-1 and ISO 3166-1 alpha-2 standard,
 // and the `LanguageMessageMap` map to be set, otherwise it will be ignored
-// returning the default message.
+// returning the default message. If a language is specified in the "en-US"
+// format, and not found, it will try to find by the root "en".
 func WithLanguage(lang string) Option {
 	return func(cE *CustomError) {
 		l, err := NewLanguage(lang)
@@ -151,6 +152,8 @@ func WithLanguage(lang string) Option {
 		}
 
 		if msg, ok := cE.LanguageMessageMap.Load(l); ok {
+			cE.language = l
+
 			cE.SetMessage(msg.(string))
 		}
 	}

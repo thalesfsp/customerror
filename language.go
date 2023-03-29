@@ -2,6 +2,7 @@ package customerror
 
 import (
 	"regexp"
+	"strings"
 	"sync"
 )
 
@@ -9,16 +10,37 @@ import (
 // Consts, vars, and types.
 //////
 
-var (
-	// ErrInvalidLangCode is returned when a language code is invalid.
-	ErrInvalidLangCode = NewInvalidError("it must be a string, two-letter lowercase ISO 639-1 code OR two-letter lowercase ISO 639-1 code followed by an optional hyphen AND a two-letter uppercase ISO 3166-1 alpha-2 country code", WithCode("CE_ERR_INVALID_LANG_CODE"))
+const (
+	Chinese    Language = "ch"
+	English    Language = "en"
+	French     Language = "fr"
+	German     Language = "de"
+	Italian    Language = "it"
+	Portuguese Language = "pt"
+	Spanish    Language = "es"
+)
 
-	// ErrInvalidLangErrorMessage is returned when an error message is invalid.
-	ErrInvalidLangErrorMessage = NewInvalidError("it must be a string, at least 3 characters long", WithCode("CE_ERR_INVALID_LANG_ERROR_MESSAGE"))
+var (
+	// ErrInvalidLanguageCode is returned when a language code is invalid.
+	ErrInvalidLanguageCode = NewInvalidError("it must be a string, two-letter lowercase ISO 639-1 code OR two-letter lowercase ISO 639-1 code followed by an optional hyphen AND a two-letter uppercase ISO 3166-1 alpha-2 country code", WithCode("CE_ERR_INVALID_LANG_CODE"))
+
+	// ErrInvalidLanguageErrorMessage is returned when an error message is invalid.
+	ErrInvalidLanguageErrorMessage = NewInvalidError("it must be a string, at least 3 characters long", WithCode("CE_ERR_INVALID_LANG_ERROR_MESSAGE"))
 
 	// ErrInvalidLanguageMessageMap is returned when a LanguageMessageMap is
 	// invalid.
 	ErrInvalidLanguageMessageMap = NewInvalidError("it must be a non-nil map of language codes to error messages", WithCode("CE_ERR_INVALID_LANGUAGE_MESSAGE_MAP"))
+
+	// BuiltInLanguages is a list of built-in prefixes languages.
+	BuiltInLanguages = []string{
+		Chinese.String(),
+		English.String(),
+		French.String(),
+		German.String(),
+		Italian.String(),
+		Portuguese.String(),
+		Spanish.String(),
+	}
 
 	// LanguageRegex is a regular expression to validate language codes based on
 	// ISO 639-1 and ISO 3166-1 alpha-2.
@@ -45,10 +67,21 @@ func (l Language) String() string {
 // Validate if lang follows the ISO 639-1 and ISO 3166-1 alpha-2 standard.
 func (l Language) Validate() error {
 	if !LanguageRegex.MatchString(l.String()) {
-		return ErrInvalidLangCode
+		return ErrInvalidLanguageCode
 	}
 
 	return nil
+}
+
+// GetRoot returns the root language code. Given "en-US", it returns "en".
+func (l Language) GetRoot() string {
+	matches := LanguageRegex.FindStringSubmatch(l.String())
+
+	if len(matches) > 1 {
+		return strings.ReplaceAll(matches[0], matches[1], "")
+	}
+
+	return ""
 }
 
 //////

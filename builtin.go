@@ -59,6 +59,17 @@ func NewRequiredError(message string, opts ...Option) error {
 	)...)
 }
 
+// NewNotFoundError is the building block for errors usually thrown when something
+// is not found, e.g: "Host not found". Default status code is `400`.
+//
+// NOTE: Status code can be redefined, call `SetStatusCode`.
+func NewNotFoundError(message string, opts ...Option) error {
+	return New(fmt.Sprintf("%s not found", message), prependOptions(
+		opts,
+		WithStatusCode(http.StatusBadRequest),
+	)...)
+}
+
 // NewHTTPError is the building block for simple HTTP errors, e.g.: Not Found.
 func NewHTTPError(statusCode int, opts ...Option) error {
 	return New(strings.ToLower(http.StatusText(statusCode)), prependOptions(

@@ -16,13 +16,12 @@ import (
 var (
 	// ErrCatalogErrorNotFound is returned when a custom error isn't found in
 	// the catalog.
-	ErrCatalogErrorNotFound = NewMissingError("error", WithCode("CE_ERR_CATALOG_ERR_NOT_FOUND"))
+	ErrCatalogErrorNotFound = NewNotFoundError("error", WithCode("CE_ERR_CATALOG_ERR_NOT_FOUND"))
 
-	// ErrCatalogInvalidName is returned when a catalog name is missing.
+	// ErrCatalogInvalidName is returned when a catalog name is invalid.
 	ErrCatalogInvalidName = NewInvalidError("name", WithCode("CE_ERR_CATALOG_INVALID_NAME"))
 
-	// ErrErrorCodeInvalidCode is returned when an error code isn't properly
-	// formatted.
+	// ErrErrorCodeInvalidCode is returned when an error code is invalid.
 	ErrErrorCodeInvalidCode = NewInvalidError("error code. It requires typeOf, and subject", WithCode("CE_ERR_INVALID_ERROR_CODE"))
 
 	// ErrorCodeRegex is a regular expression to validate error codes. It's
@@ -88,9 +87,9 @@ func (e ErrorCode) Validate() error {
 	return nil
 }
 
-// Add a custom error to the catalog. Use options to set default and common
+// Set a custom error to the catalog. Use options to set default and common
 // values such as fields, tags, etc.
-func (c *Catalog) Add(errorCode string, defaultMessage string, opts ...Option) error {
+func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) error {
 	eC, err := NewErrorCode(errorCode)
 	if err != nil {
 		return err

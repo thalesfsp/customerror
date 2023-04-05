@@ -115,6 +115,16 @@ func (c *Catalog) Get(errorCode string, opts ...Option) (*CustomError, error) {
 	return nil, fmt.Errorf("%w. Code: %s", ErrCatalogErrorNotFound, errCode)
 }
 
+// MustGet returns a custom error from the catalog, if not found, panics.
+func (c *Catalog) MustGet(errorCode string, opts ...Option) *CustomError {
+	customErr, err := c.Get(errorCode, opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return customErr
+}
+
 //////
 // Factory.
 //////

@@ -106,8 +106,6 @@ func (c *Catalog) MustSet(errorCode string, defaultMessage string, opts ...Optio
 	if err := c.Set(errorCode, defaultMessage, opts...); err != nil {
 		panic(err)
 	}
-
-	return
 }
 
 // Get returns a custom error from the catalog, if not found, returns an error.

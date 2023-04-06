@@ -100,6 +100,16 @@ func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) e
 	return nil
 }
 
+// MustSet a custom error to the catalog. Use options to set default and common
+// values such as fields, tags, etc. If an error occurs, panics.
+func (c *Catalog) MustSet(errorCode string, defaultMessage string, opts ...Option) {
+	if err := c.Set(errorCode, defaultMessage, opts...); err != nil {
+		panic(err)
+	}
+
+	return
+}
+
 // Get returns a custom error from the catalog, if not found, returns an error.
 func (c *Catalog) Get(errorCode string, opts ...Option) (*CustomError, error) {
 	errCode, err := NewErrorCode(errorCode)

@@ -89,23 +89,26 @@ func (e ErrorCode) Validate() error {
 
 // Set a custom error to the catalog. Use options to set default and common
 // values such as fields, tags, etc.
-func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) error {
+func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) (string, error) {
 	eC, err := NewErrorCode(errorCode)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	c.ErrorCodeErrorMap.Store(eC, Factory(defaultMessage, opts...))
 
-	return nil
+	return eC.String(), nil
 }
 
 // MustSet a custom error to the catalog. Use options to set default and common
 // values such as fields, tags, etc. If an error occurs, panics.
-func (c *Catalog) MustSet(errorCode string, defaultMessage string, opts ...Option) {
-	if err := c.Set(errorCode, defaultMessage, opts...); err != nil {
+func (c *Catalog) MustSet(errorCode string, defaultMessage string, opts ...Option) string {
+	ec, err := c.Set(errorCode, defaultMessage, opts...)
+	if err != nil {
 		panic(err)
 	}
+
+	return ec
 }
 
 // Get returns a custom error from the catalog, if not found, returns an error.
@@ -161,4 +164,14 @@ func NewCatalog(name string) (*Catalog, error) {
 	}
 
 	return c, nil
+}
+
+// MustNewCatalog creates a new Catalog. If an error occurs, panics.
+func MustNewCatalog(name string) *Catalog {
+	c, err := NewCatalog(name)
+	if err != nil {
+		panic(err)
+	}
+
+	return c
 }

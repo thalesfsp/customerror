@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewCatalog(t *testing.T) {
@@ -35,19 +37,25 @@ func TestNewCatalog(t *testing.T) {
 
 			// Example of adding a new language (pt-BR) to an existing error
 			// code.
-			if err := got.Set("INVALID_REQUEST_BODY", "invalid request body", WithTranslation("pt-BR", "corpo da solicitação inválido")); err != nil {
+			ec, err := got.Set("INVALID_REQUEST_BODY", "invalid request body", WithTranslation("pt-BR", "corpo da solicitação inválido"))
+			if err != nil {
 				t.Errorf("NewCatalog() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
 			}
+
+			assert.NotEmpty(t, ec)
 
 			// Example of adding a new language (es-ES) to an existing error
 			// code.
-			if err := got.Set("E1010", "invalid response", WithTranslation("es-ES", "resposta inválida")); err != nil {
+			ec1, err := got.Set("E1010", "invalid response", WithTranslation("es-ES", "resposta inválida"))
+			if err != nil {
 				t.Errorf("NewCatalog() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
 			}
+
+			assert.NotEmpty(t, ec1)
 
 			cEInvalidRequestBodyErr, err := got.Get("INVALID_REQUEST_BODY")
 			if err != nil {

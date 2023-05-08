@@ -66,7 +66,7 @@ func NewRequiredError(message string, opts ...Option) error {
 func NewNotFoundError(message string, opts ...Option) error {
 	return New(fmt.Sprintf("%s not found", message), prependOptions(
 		opts,
-		WithStatusCode(http.StatusBadRequest),
+		WithStatusCode(http.StatusNotFound),
 	)...)
 }
 

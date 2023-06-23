@@ -48,7 +48,7 @@ func TestNewLowLevel(t *testing.T) {
 			name: "should work - with message, and code",
 			args: args{
 				message: failedCreateSomethingMsg,
-				opts:    []Option{WithCode(code)},
+				opts:    []Option{WithErrorCode(code)},
 			},
 			want: "E1010: Failed to create something",
 		},
@@ -80,7 +80,7 @@ func TestNewLowLevel(t *testing.T) {
 			name: "should work - with message, code, and error",
 			args: args{
 				message: failedCreateSomethingMsg,
-				opts:    []Option{WithCode(code), WithError(ErrFailedToReachServer)},
+				opts:    []Option{WithErrorCode(code), WithError(ErrFailedToReachServer)},
 			},
 			want: "E1010: Failed to create something. Original Error: Failed to reach servers",
 		},
@@ -88,7 +88,7 @@ func TestNewLowLevel(t *testing.T) {
 			name: "should work - with message, code, error, and deep error",
 			args: args{
 				message: failedCreateSomethingMsg,
-				opts:    []Option{WithCode(code), WithError(ErrFailedToReachServerDeep)},
+				opts:    []Option{WithErrorCode(code), WithError(ErrFailedToReachServerDeep)},
 			},
 			want: "E1010: Failed to create something. Original Error: Failed to reach servers. Servers are broken",
 		},
@@ -96,7 +96,7 @@ func TestNewLowLevel(t *testing.T) {
 			name: "should work - with message, code, error, deep error, and status code",
 			args: args{
 				message: failedCreateSomethingMsg,
-				opts:    []Option{WithCode(code), WithError(ErrFailedToReachServerDeep), WithStatusCode(statusCode)},
+				opts:    []Option{WithErrorCode(code), WithError(ErrFailedToReachServerDeep), WithStatusCode(statusCode)},
 			},
 			want: "E1010: Failed to create something. Original Error: Failed to reach servers. Servers are broken",
 		},
@@ -113,11 +113,11 @@ func TestNewLowLevel(t *testing.T) {
 }
 
 func TestBuiltin(t *testing.T) {
-	ErrFailedToCreateFile := NewFailedToError("create file", WithCode("E1010"))
-	ErrInvalidPath := NewInvalidError("path", WithCode("E1010"))
-	ErrMissingPath := NewMissingError("path", WithCode("E1010"))
-	ErrRequiredPath := NewRequiredError("path is", WithCode("E1010"))
-	ErrNotFound := NewHTTPError(http.StatusNotFound, WithCode("E1010"))
+	ErrFailedToCreateFile := NewFailedToError("create file", WithErrorCode("E1010"))
+	ErrInvalidPath := NewInvalidError("path", WithErrorCode("E1010"))
+	ErrMissingPath := NewMissingError("path", WithErrorCode("E1010"))
+	ErrRequiredPath := NewRequiredError("path is", WithErrorCode("E1010"))
+	ErrNotFound := NewHTTPError(http.StatusNotFound, WithErrorCode("E1010"))
 
 	testFunc := func(e error) error { return e }
 

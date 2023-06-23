@@ -30,10 +30,10 @@ var (
 		"template",
 		"Please set one using `SetErrorPrefixMap`",
 		strings.Join(BuiltInLanguages, ", "),
-	), WithCode("CE_ERR_TEMPLATE_NOT_FOUND"))
+	), WithErrorCode("CE_ERR_TEMPLATE_NOT_FOUND"))
 
 	// ErrLanguageNotFound is returned when a language isn't found in the map.
-	ErrLanguageNotFound = NewNotFoundError("language. Please set one using `SetErrorPrefixMap`", WithCode("CE_ERR_LANGUAGE_NOT_FOUND"))
+	ErrLanguageNotFound = NewNotFoundError("language. Please set one using `SetErrorPrefixMap`", WithErrorCode("CE_ERR_LANGUAGE_NOT_FOUND"))
 )
 
 type (

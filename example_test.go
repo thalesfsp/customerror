@@ -29,7 +29,7 @@ func checkIfStringContainsMany(s string, subs ...string) []string {
 // check, and instrospect custom errors.
 func ExampleNew() {
 	// Custom static error definition.
-	ErrMissingID := NewMissingError("id", WithCode("E1010"))
+	ErrMissingID := NewMissingError("id", WithErrorCode("E1010"))
 
 	// Some function, for demo purpose.
 	SomeFunc := func(id string) error {
@@ -39,7 +39,7 @@ func ExampleNew() {
 		}
 
 		// Dynamic custom error.
-		return NewFailedToError("write to disk", WithCode("E1523"))
+		return NewFailedToError("write to disk", WithErrorCode("E1523"))
 	}
 
 	// Case: Without `id`, returns `ErrMissingID`.
@@ -78,7 +78,7 @@ func ExampleNew() {
 //nolint:errorlint,forcetypeassert
 func ExampleNew_options() {
 	fmt.Println(
-		NewMissingError("id", WithCode("E1010"), WithStatusCode(http.StatusNotAcceptable), WithError(errors.New("some error"))).(*CustomError).APIError(),
+		NewMissingError("id", WithErrorCode("E1010"), WithStatusCode(http.StatusNotAcceptable), WithError(errors.New("some error"))).(*CustomError).APIError(),
 	)
 
 	// output:
@@ -156,14 +156,14 @@ func ExampleNew_newHTTPError() {
 //nolint:errorlint,forcetypeassert
 func ExampleNew_newNoMessage() {
 	fmt.Println(New("", WithStatusCode(http.StatusAccepted)))
-	fmt.Println(New("", WithStatusCode(http.StatusAccepted), WithCode("E1010")))
+	fmt.Println(New("", WithStatusCode(http.StatusAccepted), WithErrorCode("E1010")))
 	fmt.Println(New("", WithStatusCode(http.StatusAccepted)).(*CustomError).APIError())
-	fmt.Println(New("", WithStatusCode(http.StatusAccepted), WithCode("E1010")).(*CustomError).APIError())
+	fmt.Println(New("", WithStatusCode(http.StatusAccepted), WithErrorCode("E1010")).(*CustomError).APIError())
 
-	fmt.Println(New("", WithCode("E1010")))
-	fmt.Println(New("", WithCode("E1010"), WithStatusCode(http.StatusAccepted)))
-	fmt.Println(New("", WithCode("E1010")).(*CustomError).APIError())
-	fmt.Println(New("", WithCode("E1010"), WithStatusCode(http.StatusAccepted)).(*CustomError).APIError())
+	fmt.Println(New("", WithErrorCode("E1010")))
+	fmt.Println(New("", WithErrorCode("E1010"), WithStatusCode(http.StatusAccepted)))
+	fmt.Println(New("", WithErrorCode("E1010")).(*CustomError).APIError())
+	fmt.Println(New("", WithErrorCode("E1010"), WithStatusCode(http.StatusAccepted)).(*CustomError).APIError())
 
 	// output:
 	// Accepted
@@ -183,7 +183,7 @@ func ExampleNew_optionsWithTag() {
 	fmt.Println(NewMissingError(
 		"id",
 		WithTag("test1", "test2"),
-		WithCode("E1010"),
+		WithErrorCode("E1010"),
 		WithStatusCode(http.StatusNotAcceptable),
 		WithError(errors.New("some error")),
 	))
@@ -191,7 +191,7 @@ func ExampleNew_optionsWithTag() {
 	fmt.Println(NewMissingError(
 		"id",
 		WithTag("test1", "test2"),
-		WithCode("E1010"),
+		WithErrorCode("E1010"),
 		WithStatusCode(http.StatusNotAcceptable),
 		WithError(errors.New("some error")),
 	).(*CustomError).APIError())
@@ -215,7 +215,7 @@ func ExampleNew_optionsWithFields() {
 			"testKey1": "testValue1",
 			"testKey2": "testValue2",
 		}),
-		WithCode("E1010"),
+		WithErrorCode("E1010"),
 		WithStatusCode(http.StatusNotAcceptable),
 		WithError(errors.New("some error")),
 	))
@@ -227,7 +227,7 @@ func ExampleNew_optionsWithFields() {
 			"testKey1": "testValue1",
 			"testKey2": "testValue2",
 		}),
-		WithCode("E1010"),
+		WithErrorCode("E1010"),
 		WithStatusCode(http.StatusNotAcceptable),
 		WithError(errors.New("some error")),
 	).(*CustomError).APIError())
@@ -259,7 +259,7 @@ func ExampleNew_optionsWithField() {
 		WithTag("test1", "test2"),
 		WithField("testKey1", "testValue1"),
 		WithField("testKey2", "testValue2"),
-		WithCode("E1010"),
+		WithErrorCode("E1010"),
 		WithStatusCode(http.StatusNotAcceptable),
 		WithError(errors.New("some error")),
 	))
@@ -269,7 +269,7 @@ func ExampleNew_optionsWithField() {
 		WithTag("test1", "test2"),
 		WithField("testKey1", "testValue1"),
 		WithField("testKey2", "testValue2"),
-		WithCode("E1010"),
+		WithErrorCode("E1010"),
 		WithStatusCode(http.StatusNotAcceptable),
 		WithError(errors.New("some error")),
 	).(*CustomError).APIError())

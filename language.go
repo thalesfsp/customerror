@@ -22,14 +22,14 @@ const (
 
 var (
 	// ErrInvalidLanguageCode is returned when a language code is invalid.
-	ErrInvalidLanguageCode = NewInvalidError("it must be a string, two-letter lowercase ISO 639-1 code OR two-letter lowercase ISO 639-1 code followed by an optional hyphen AND a two-letter uppercase ISO 3166-1 alpha-2 country code", WithCode("CE_ERR_INVALID_LANG_CODE"))
+	ErrInvalidLanguageCode = NewInvalidError("it must be a string, two-letter lowercase ISO 639-1 code OR two-letter lowercase ISO 639-1 code followed by an optional hyphen AND a two-letter uppercase ISO 3166-1 alpha-2 country code", WithErrorCode("CE_ERR_INVALID_LANG_CODE"))
 
 	// ErrInvalidLanguageErrorMessage is returned when an error message is invalid.
-	ErrInvalidLanguageErrorMessage = NewInvalidError("it must be a string, at least 3 characters long", WithCode("CE_ERR_INVALID_LANG_ERROR_MESSAGE"))
+	ErrInvalidLanguageErrorMessage = NewInvalidError("it must be a string, at least 3 characters long", WithErrorCode("CE_ERR_INVALID_LANG_ERROR_MESSAGE"))
 
 	// ErrInvalidLanguageMessageMap is returned when a LanguageMessageMap is
 	// invalid.
-	ErrInvalidLanguageMessageMap = NewInvalidError("it must be a non-nil map of language codes to error messages", WithCode("CE_ERR_INVALID_LANGUAGE_MESSAGE_MAP"))
+	ErrInvalidLanguageMessageMap = NewInvalidError("it must be a non-nil map of language codes to error messages", WithErrorCode("CE_ERR_INVALID_LANGUAGE_MESSAGE_MAP"))
 
 	// BuiltInLanguages is a list of built-in prefixes languages.
 	BuiltInLanguages = []string{

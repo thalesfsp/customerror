@@ -57,8 +57,8 @@ func WithMessage(msg string) Option {
 	}
 }
 
-// WithCode allows to specify an error code, such as "E1010".
-func WithCode(code string) Option {
+// WithErrorCode allows to specify an error code, such as "E1010".
+func WithErrorCode(code string) Option {
 	return func(cE *CustomError) {
 		cE.Code = code
 	}

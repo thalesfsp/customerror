@@ -16,13 +16,13 @@ import (
 var (
 	// ErrCatalogErrorNotFound is returned when a custom error isn't found in
 	// the catalog.
-	ErrCatalogErrorNotFound = NewNotFoundError("error", WithCode("CE_ERR_CATALOG_ERR_NOT_FOUND"))
+	ErrCatalogErrorNotFound = NewNotFoundError("error", WithErrorCode("CE_ERR_CATALOG_ERR_NOT_FOUND"))
 
 	// ErrCatalogInvalidName is returned when a catalog name is invalid.
-	ErrCatalogInvalidName = NewInvalidError("name", WithCode("CE_ERR_CATALOG_INVALID_NAME"))
+	ErrCatalogInvalidName = NewInvalidError("name", WithErrorCode("CE_ERR_CATALOG_INVALID_NAME"))
 
 	// ErrErrorCodeInvalidCode is returned when an error code is invalid.
-	ErrErrorCodeInvalidCode = NewInvalidError("error code. It requires typeOf, and subject", WithCode("CE_ERR_INVALID_ERROR_CODE"))
+	ErrErrorCodeInvalidCode = NewInvalidError("error code. It requires typeOf, and subject", WithErrorCode("CE_ERR_INVALID_ERROR_CODE"))
 
 	// ErrorCodeRegex is a regular expression to validate error codes. It's
 	// designed to match four distinct patterns:

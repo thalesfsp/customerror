@@ -374,7 +374,8 @@ func (cE *CustomError) APIError() string {
 	return errMsg
 }
 
-func (cE *CustomError) X(errorType string, opts ...Option) *CustomError {
+// FormatError formats the error message with the given error type.
+func (cE *CustomError) FormatError(errorType string, opts ...Option) *CustomError {
 	if cE == nil {
 		return nil
 	}
@@ -419,7 +420,7 @@ func (cE *CustomError) X(errorType string, opts ...Option) *CustomError {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewFailedToError(opts ...Option) error {
-	finalCE := cE.X(string(FailedTo), opts...)
+	finalCE := cE.FormatError(string(FailedTo), opts...)
 
 	if finalCE.language == "" {
 		finalCE = Copy(NewFailedToError(finalCE.Message, opts...).(*CustomError), finalCE)
@@ -438,7 +439,7 @@ func (cE *CustomError) NewFailedToError(opts ...Option) error {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewInvalidError(opts ...Option) error {
-	finalCE := cE.X(string(Invalid), opts...)
+	finalCE := cE.FormatError(string(Invalid), opts...)
 
 	if finalCE.language == "" {
 		finalCE = Copy(NewInvalidError(finalCE.Message, opts...).(*CustomError), finalCE)
@@ -457,7 +458,7 @@ func (cE *CustomError) NewInvalidError(opts ...Option) error {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewMissingError(opts ...Option) error {
-	finalCE := cE.X(Missing.String(), opts...)
+	finalCE := cE.FormatError(Missing.String(), opts...)
 
 	if finalCE.language == "" {
 		finalCE = Copy(NewMissingError(finalCE.Message, opts...).(*CustomError), finalCE)
@@ -476,7 +477,7 @@ func (cE *CustomError) NewMissingError(opts ...Option) error {
 //
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewRequiredError(opts ...Option) error {
-	finalCE := cE.X(Required.String(), opts...)
+	finalCE := cE.FormatError(Required.String(), opts...)
 
 	if finalCE.language == "" {
 		finalCE = Copy(NewRequiredError(finalCE.Message, opts...).(*CustomError), finalCE)
@@ -651,6 +652,17 @@ func Is(err error) bool {
 	_, ok := err.(*CustomError)
 
 	return ok
+}
+
+// To converts the error to a `CustomError`.
+func To(err error) *CustomError {
+	cE, ok := err.(*CustomError)
+
+	if !ok {
+		return nil
+	}
+
+	return cE
 }
 
 // IsHTTPStatus checks if the error is a `CustomError` with the

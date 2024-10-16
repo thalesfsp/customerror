@@ -397,7 +397,7 @@ func ExampleNew_newRetryableError() {
 	fmt.Println(IsRetryable(retryableCE))
 	fmt.Println(IsErrorCode(retryableCE, "E1523"))
 	fmt.Println(IsHTTPStatus(retryableCE, http.StatusInternalServerError))
-	fmt.Println(Is(retryableCE))
+	fmt.Println(IsCustomError(retryableCE))
 
 	toCE := To(retryableCE)
 	fmt.Println(toCE.StatusCode)

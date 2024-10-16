@@ -21,7 +21,11 @@ import (
 // Helpers.
 //////
 
-// Copy src to target.
+// Copy performs a deep copy of the src CustomError into the target CustomError.
+// It ensures that all fields, including nested structures like maps and sets,
+// are properly copied. This function is useful when you need to create a new
+// CustomError instance based on an existing one, while avoiding any shared
+// references to mutable fields.
 func Copy(src, target *CustomError) *CustomError {
 	if src.Code != "" {
 		target.Code = src.Code
@@ -163,12 +167,16 @@ func syncMapToMap(sm *sync.Map) map[string]interface{} {
 	return m
 }
 
-// Set is a wrapper around the treeset.Set.
+// Set is a wrapper around the treeset.Set, providing a collection
+// that stores unique elements in a sorted order. It is used in the
+// CustomError struct to maintain a sorted set of tags.
 type Set struct {
 	*treeset.Set
 }
 
-// Implement Stringer interface.
+// String implements the Stringer interface for the Set type.
+// It returns a comma-separated string representation of all elements
+// in the set, useful for debugging and error message formatting.
 func (s *Set) String() string {
 	items := []string{}
 
@@ -647,8 +655,8 @@ func Factory(message string, opts ...Option) *CustomError {
 	return newInternal(prependOptions(opts, WithMessage(message))...)
 }
 
-// Is checks if the error is a `CustomError`.
-func Is(err error) bool {
+// IsCustomError checks if the error is a `CustomError`.
+func IsCustomError(err error) bool {
 	_, ok := err.(*CustomError)
 
 	return ok

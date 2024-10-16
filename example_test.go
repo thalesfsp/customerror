@@ -11,6 +11,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/eapache/go-resiliency/retrier"
 )
 
 func checkIfStringContainsMany(s string, subs ...string) []string {
@@ -333,5 +336,73 @@ func ExampleNew_newFactory() {
 	}
 
 	// output:
+	// true
+}
+
+type CustomClassifier struct{}
+
+// Classify implements the Classifier interface.
+func (hSCC CustomClassifier) Classify(err error) retrier.Action {
+	// Should do nothing if there's no error.
+	if err == nil {
+		return retrier.Succeed
+	}
+
+	//////
+	// Cast error into customerror to evaluate if the error is retryable.
+	//////
+
+	var cE *CustomError
+
+	if errors.As(err, &cE) {
+		if cE.Retryable {
+			// Update the error to be retried.
+			cE.SetRetried(true)
+
+			return retrier.Retry
+		}
+	}
+
+	// Should fail for everything else.
+	return retrier.Fail
+}
+
+// ExampleNew_Retryable error and SetRetried function. In this example the go
+// go-resiliency/retrier package will be used, but any other retry package
+// should work as well. Additionally, the example demonstrates how to check if
+// the error is retryable, if it has a specific error code, if it has a specific
+// HTTP status code, and if it is a custom error.
+func ExampleNew_newRetryableError() {
+	// Create a custom retryable error.
+	retryableCE := NewFailedToError(
+		"write to disk",
+		WithErrorCode("E1523"),
+		WithRetryable(true),
+	)
+
+	// Initialize a retrier with exponential backoff strategy.
+	r1 := retrier.New(
+		retrier.ConstantBackoff(1, 300*time.Millisecond),
+		CustomClassifier{},
+	)
+
+	// Execute the request with retry logic.
+	if err := r1.Run(func() error {
+		// Throw the retryable error.
+		return retryableCE
+	}); err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println(IsCustomErrorRetryable(retryableCE))
+	fmt.Println(IsCustomErrorCode(retryableCE, "E1523"))
+	fmt.Println(IsCustomErrorHTTPStatus(retryableCE, http.StatusInternalServerError))
+	fmt.Println(IsCustomError(retryableCE))
+
+	// output:
+	// E1523: failed to write to disk. Retryable: true. Retried: true
+	// true
+	// true
+	// true
 	// true
 }

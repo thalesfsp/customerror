@@ -27,6 +27,14 @@ func Copy(src, target *CustomError) *CustomError {
 		target.Code = src.Code
 	}
 
+	if src.Retryable {
+		target.Retryable = src.Retryable
+	}
+
+	if src.Retried {
+		target.Retried = src.Retried
+	}
+
 	if src.Err != nil {
 		target.Err = src.Err
 	}
@@ -99,7 +107,7 @@ func Copy(src, target *CustomError) *CustomError {
 			target.Tags = &Set{treeset.NewWithStringComparator()}
 		}
 
-		src.Tags.Each(func(index int, value interface{}) {
+		src.Tags.Each(func(_ int, value interface{}) {
 			target.Tags.Add(value)
 		})
 	}
@@ -108,7 +116,10 @@ func Copy(src, target *CustomError) *CustomError {
 }
 
 // Process fields and add them to the error message.
-func processFields(errMsg string, fields *sync.Map) string {
+func processFields(
+	errMsg string,
+	fields *sync.Map,
+) string {
 	if fields != nil {
 		errMsg = fmt.Sprintf("%s. Fields:", errMsg)
 
@@ -161,7 +172,7 @@ type Set struct {
 func (s *Set) String() string {
 	items := []string{}
 
-	s.Each(func(index int, value interface{}) {
+	s.Each(func(_ int, value interface{}) {
 		items = append(items, fmt.Sprintf("%v", value))
 	})
 
@@ -190,6 +201,12 @@ type CustomError struct {
 	// LanguageErrorTypeMap is a map of language prefixes to templates such
 	// as "missing %s", "%s required", "%s invalid", etc.
 	LanguageErrorTypeMap LanguageErrorMap `json:"languageErrorTypeMap"`
+
+	// Retryable indicates if the error is retryable.
+	Retryable bool `json:"retryable"`
+
+	// Retried indicates if the error has been retried.
+	Retried bool `json:"retried"`
 
 	// StatusCode is a valid HTTP status code, e.g.: 404.
 	StatusCode int `json:"-" validate:"omitempty,gte=100,lte=511"`
@@ -231,6 +248,10 @@ func (cE *CustomError) Error() string {
 
 	errMsg = processFields(errMsg, cE.Fields)
 
+	if cE.Retryable {
+		errMsg = fmt.Sprintf("%s. Retryable: %t. Retried: %t", errMsg, cE.Retryable, cE.Retried)
+	}
+
 	return errMsg
 }
 
@@ -271,6 +292,14 @@ func (cE *CustomError) MarshalJSON() ([]byte, error) {
 		temp["tags"] = cE.Tags
 	}
 
+	if cE.Retryable {
+		temp["retryable"] = cE.Retryable
+	}
+
+	if cE.Retried {
+		temp["retried"] = cE.Retried
+	}
+
 	if cE.Fields != nil {
 		// Convert the sync.Map to a regular map so that we can iterate over its keys.
 		fields := syncMapToMap(cE.Fields)
@@ -283,6 +312,10 @@ func (cE *CustomError) MarshalJSON() ([]byte, error) {
 				}
 			}
 		}
+	}
+
+	if cE.StatusCode > 0 {
+		temp["statusCode"] = cE.StatusCode
 	}
 
 	// Serialize the temporary map to JSON.
@@ -333,6 +366,10 @@ func (cE *CustomError) APIError() string {
 	}
 
 	errMsg = processFields(errMsg, cE.Fields)
+
+	if cE.Retryable {
+		errMsg = fmt.Sprintf("%s. Retryable: %t. Retried: %t", errMsg, cE.Retryable, cE.Retried)
+	}
 
 	return errMsg
 }
@@ -541,14 +578,17 @@ func (cE *CustomError) SetMessage(message string) {
 	cE.Message = message
 }
 
+// SetRetried sets if the error has been retried.
+func (cE *CustomError) SetRetried(status bool) {
+	cE.Retried = status
+}
+
 //////
 // Factory.
 //////
 
-// Base new.
-//
-//nolint:predeclared
-func new(opts ...Option) *CustomError {
+// Base newInternal.
+func newInternal(opts ...Option) *CustomError {
 	cE := &CustomError{}
 
 	// Apply options.
@@ -573,8 +613,10 @@ func new(opts ...Option) *CustomError {
 }
 
 // New creates a new validated custom error returning it as en `error`.
+//
+//nolint:revive
 func New(message string, opts ...Option) error {
-	cE := new(prependOptions(opts, WithMessage(message))...)
+	cE := newInternal(prependOptions(opts, WithMessage(message))...)
 
 	if cE == nil {
 		return nil
@@ -601,5 +643,47 @@ func New(message string, opts ...Option) error {
 // - `NewRequiredError`
 // - `NewHTTPError`.
 func Factory(message string, opts ...Option) *CustomError {
-	return new(prependOptions(opts, WithMessage(message))...)
+	return newInternal(prependOptions(opts, WithMessage(message))...)
+}
+
+// IsCustomError checks if the error is a `CustomError`.
+func IsCustomError(err error) bool {
+	_, ok := err.(*CustomError)
+
+	return ok
+}
+
+// IsCustomErrorHTTPStatus checks if the error is a `CustomError` with the
+// specified HTTP status code.
+func IsCustomErrorHTTPStatus(err error, statusCode int) bool {
+	cE, ok := err.(*CustomError)
+
+	if !ok {
+		return false
+	}
+
+	return cE.StatusCode == statusCode
+}
+
+// IsCustomErrorCode checks if the error is a `CustomError` with the
+// specified code.
+func IsCustomErrorCode(err error, code string) bool {
+	cE, ok := err.(*CustomError)
+
+	if !ok {
+		return false
+	}
+
+	return cE.Code == code
+}
+
+// IsCustomErrorRetryable checks if the error is a retryable `CustomError`.
+func IsCustomErrorRetryable(err error) bool {
+	cE, ok := err.(*CustomError)
+
+	if !ok {
+		return false
+	}
+
+	return cE.Retryable
 }

@@ -24,6 +24,9 @@ linters:
     - varnamelen
     - errorlint
     - forcetypeassert
+    - perfsprint
+    - depguard
+    - testifylint
   fast: false
 
 # Settings for specific linters

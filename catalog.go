@@ -111,7 +111,7 @@ func (c *Catalog) MustSet(errorCode string, defaultMessage string, opts ...Optio
 }
 
 // Get returns a custom error from the catalog, if not found, returns an error.
-func (c *Catalog) Get(errorCode string, opts ...Option) (*CustomError, error) {
+func (c *Catalog) Get(errorCode string, _ ...Option) (*CustomError, error) {
 	errCode, err := NewErrorCode(errorCode)
 	if err != nil {
 		return nil, err

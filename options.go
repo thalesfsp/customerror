@@ -64,6 +64,13 @@ func WithErrorCode(code string) Option {
 	}
 }
 
+// WithRetryable allows to specify if the error is retryable.
+func WithRetryable(status bool) Option {
+	return func(cE *CustomError) {
+		cE.Retryable = status
+	}
+}
+
 // WithStatusCode allows to specify the status code, such as "200".
 func WithStatusCode(statusCode int) Option {
 	return func(cE *CustomError) {

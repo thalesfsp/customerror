@@ -62,6 +62,8 @@ func (e ErrorType) String() string {
 //////
 
 // GetLanguageErrorMap returns the language prefix template map.
+//
+//nolint:gosmopolitan
 func GetLanguageErrorMap() LanguageErrorMap {
 	once.Do(func() {
 		languageErrorTypeMap := &sync.Map{}

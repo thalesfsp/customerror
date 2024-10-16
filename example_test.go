@@ -394,10 +394,10 @@ func ExampleNew_newRetryableError() {
 		fmt.Println(err)
 	}
 
-	fmt.Println(IsCustomErrorRetryable(retryableCE))
-	fmt.Println(IsCustomErrorCode(retryableCE, "E1523"))
-	fmt.Println(IsCustomErrorHTTPStatus(retryableCE, http.StatusInternalServerError))
-	fmt.Println(IsCustomError(retryableCE))
+	fmt.Println(IsRetryable(retryableCE))
+	fmt.Println(IsErrorCode(retryableCE, "E1523"))
+	fmt.Println(IsHTTPStatus(retryableCE, http.StatusInternalServerError))
+	fmt.Println(Is(retryableCE))
 
 	// output:
 	// E1523: failed to write to disk. Retryable: true. Retried: true

@@ -646,16 +646,16 @@ func Factory(message string, opts ...Option) *CustomError {
 	return newInternal(prependOptions(opts, WithMessage(message))...)
 }
 
-// IsCustomError checks if the error is a `CustomError`.
-func IsCustomError(err error) bool {
+// Is checks if the error is a `CustomError`.
+func Is(err error) bool {
 	_, ok := err.(*CustomError)
 
 	return ok
 }
 
-// IsCustomErrorHTTPStatus checks if the error is a `CustomError` with the
+// IsHTTPStatus checks if the error is a `CustomError` with the
 // specified HTTP status code.
-func IsCustomErrorHTTPStatus(err error, statusCode int) bool {
+func IsHTTPStatus(err error, statusCode int) bool {
 	cE, ok := err.(*CustomError)
 
 	if !ok {
@@ -665,9 +665,9 @@ func IsCustomErrorHTTPStatus(err error, statusCode int) bool {
 	return cE.StatusCode == statusCode
 }
 
-// IsCustomErrorCode checks if the error is a `CustomError` with the
+// IsErrorCode checks if the error is a `CustomError` with the
 // specified code.
-func IsCustomErrorCode(err error, code string) bool {
+func IsErrorCode(err error, code string) bool {
 	cE, ok := err.(*CustomError)
 
 	if !ok {
@@ -677,8 +677,8 @@ func IsCustomErrorCode(err error, code string) bool {
 	return cE.Code == code
 }
 
-// IsCustomErrorRetryable checks if the error is a retryable `CustomError`.
-func IsCustomErrorRetryable(err error) bool {
+// IsRetryable checks if the error is a retryable `CustomError`.
+func IsRetryable(err error) bool {
 	cE, ok := err.(*CustomError)
 
 	if !ok {

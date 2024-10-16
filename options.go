@@ -166,7 +166,24 @@ func WithLanguage(lang string) Option {
 	}
 }
 
-// WithTranslation sets translations for the error message.
+// WithTranslation sets the translation for the error message.
+//
+// NOTE: For supported built-in languages, the default word(s) used by
+// the built-in error functions (example: `NewFailedToError`), are
+// automatically translated and included in the message.
+//
+// SEE: `languages.go` file an up-to-date list of the supported built-in
+// list of languages.
+//
+// For ANY other language there are two options:
+// 1. Don't use the built-in functions but instead use the `New` function
+// and write the message in full, for example: "invalid hard drive path".
+// 2. Setup the language (see `ExampleNew_i18nSetupNewLang`).
+//
+// Reason: It's impossible for any package to cover all the possible
+// languages, combinations, and their translations.
+//
+// SEE: `i18n.md` file for more information.
 func WithTranslation(lang, message string) Option {
 	return func(cE *CustomError) {
 		if cE.LanguageMessageMap == nil {

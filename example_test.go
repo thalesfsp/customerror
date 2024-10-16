@@ -339,6 +339,192 @@ func ExampleNew_newFactory() {
 	// true
 }
 
+// ExampleNew_i18n demonstrates how to create an error catalog with translations
+// and how to throw errors in different languages.
+//
+// SEE: `i18n.md` file for more information.
+func ExampleNew_i18n() {
+	//////
+	// The following, is usually defined in the `errorcatalog.go` file.
+	//////
+
+	const (
+		//////
+		// Define the error code constant. It helps to identify the error in
+		// systems like Elasticsearch, Splunk and Datadog. It also helps to
+		// maintain consistency across the application.
+		//////
+
+		ErrInvalidHardDrivePath = "ERR_INVALID_HARD_DRIVE_PATH"
+	)
+
+	// Create the application error catalog.
+	catalog := MustNewCatalog("myIncredibleApp").
+		// Add errors by their constant error codes while setting up the
+		// translations. For Spanish and French, it uses the built-in list of
+		// common languages instead of hardcoding the language.
+		//
+		// NOTE: For supported built-in languages, the default word(s) used by
+		// the built-in error functions (example: `NewFailedToError`), are
+		// automatically translated and included in the message.
+		//
+		// SEE: `languages.go` file an up-to-date list of the supported built-in
+		// list of languages.
+		//
+		// For ANY other language there are two options:
+		// 1. Don't use the built-in functions but instead use the `New` function
+		// and write the message in full, for example: "invalid hard drive path".
+		// 2. Setup the language (see `ExampleNew_i18nSetupNewLang`).
+		//
+		// Reason: It's impossible for any package to cover all the possible
+		// languages, combinations, and their translations.
+		//
+		// No need to add the "invalid" word.
+		MustSet(ErrInvalidHardDrivePath, "hard drive path",
+			// No need to add the "invalid" word.
+			WithTranslation(Spanish.String(), "ruta de disco duro"),
+
+			// No need to add the "invalid" word.
+			WithTranslation(French.String(), "chemin de disque dur"),
+		)
+
+	//////
+	// The following, from anywhere in the application.
+	//////
+
+	// Retrieve the error from the catalog.
+	err := catalog.MustGet(ErrInvalidHardDrivePath)
+
+	// Throw that in the Spanish language as an and using the built-in
+	// `InvalidError` function which automatically sets the HTTP status code to
+	// `StatusBadRequest`. The language is specified by using the built-in list
+	// of languages. The default "invalid" word is automatically translated.
+	//
+	// SEE: `languages.go` file for the list of languages.
+	fmt.Println(err.NewInvalidError(WithLanguage(Spanish.String())))
+
+	// The same, but in French.
+	fmt.Println(err.NewInvalidError(WithLanguage(French.String())))
+
+	// The same, standard way - in English.
+	fmt.Println(err.NewInvalidError())
+
+	// output:
+	// ruta de disco duro inválido
+	// chemin de disque dur invalide
+	// invalid hard drive path
+}
+
+// ExampleNew_i18n demonstrates how to create an error catalog with translations
+// how to throw errors in different languages, and how to setup a new language.
+//
+// SEE: `i18n.md` file for more information.
+func ExampleNew_i18nSetupNewLang() {
+	//////
+	// The following, is usually defined in the `errorcatalog.go` file.
+	//////
+
+	// Define a constant for the new language, to help with consistency.
+	const Japanase = "jp"
+
+	// Let's pretend that beyond English, Spanish, and French, the
+	// application must support Japanese. In this case, Japanase is not part
+	// of the built-in list of languages. We start by setting up the language,
+	// and the respective built-in functions error messages.
+	//
+	// NOTE: MustAddNewLanguage properly updates the internal, package-level,
+	// singleton.
+	//
+	// WARN: If you use `MustAddNewLanguage`, and specify an invalid language
+	// such as "asd", it will panic! The language must be a valid ISO 639-1 or
+	// ISO 3166-1 alpha-2.
+	MustAddNewLanguage("jp", NewErrorPrefixMap(
+		// "failed to" template.
+		"%s に失敗しました",
+
+		// "invalid" template.
+		"%s が無効です",
+
+		// "missing" template.
+		"%s が見つかりません",
+
+		// "required" template.
+		"%s が必要です",
+
+		// "not found" template.
+		"%s が見つかりませんでした",
+	))
+
+	const (
+		//////
+		// Define the error code constant. It helps to identify the error in
+		// systems like Elasticsearch, Splunk and Datadog. It also helps to
+		// maintain consistency across the application.
+		//////
+
+		ErrInvalidHardDrivePath = "ERR_INVALID_HARD_DRIVE_PATH"
+	)
+
+	// Create the application error catalog.
+	catalog := MustNewCatalog("myIncredibleApp").
+		// Add errors by their constant error codes while setting up the
+		// translations. For Spanish and French, it uses the built-in list of
+		// common languages instead of hardcoding the language.
+		//
+		// NOTE: For supported built-in languages, the default word(s) used by
+		// the built-in error functions (example: `NewFailedToError`), are
+		// automatically translated and included in the message.
+		//
+		// SEE: `languages.go` file an up-to-date list of the supported built-in
+		// list of languages.
+		//
+		// For ANY other language there are two options:
+		// 1. Don't use the built-in functions but instead use the `New` function
+		// and write the message in full, for example: "invalid hard drive path".
+		// 2. Setup the language (see `ExampleNew_i18nSetupNewLang`).
+		//
+		// Reason: It's impossible for any package to cover all the possible
+		// languages, combinations, and their translations.
+		//
+		// No need to add the "invalid" word.
+		MustSet(ErrInvalidHardDrivePath, "hard drive path",
+			// No need to add the "invalid" word.
+			WithTranslation(Spanish.String(), "ruta de disco duro"),
+
+			// No need to add the "invalid" word.
+			WithTranslation(French.String(), "chemin de disque dur"),
+
+			// Added support, no need to add the "invalid" word.
+			WithTranslation("jp", "ハードドライブのパス"),
+		)
+
+	// Retrieve the error from the catalog.
+	err := catalog.MustGet(ErrInvalidHardDrivePath)
+
+	// Throw that in the Spanish language as an and using the built-in
+	// `InvalidError` function which automatically sets the HTTP status code to
+	// `StatusBadRequest`. The language is specified by using the built-in list
+	// of languages. The default "invalid" word is automatically translated.
+	//
+	// SEE: `languages.go` file for the list of languages.
+	fmt.Println(err.NewInvalidError(WithLanguage(Spanish.String())))
+
+	// The same, but in French.
+	fmt.Println(err.NewInvalidError(WithLanguage(French.String())))
+
+	// The same, but in Japanese.
+	fmt.Println(err.NewInvalidError(WithLanguage(Japanase)))
+
+	// The same, standard way - in English.
+	fmt.Println(err.NewInvalidError())
+
+	// output:
+	// ruta de disco duro inválido
+	// chemin de disque dur invalide
+	// ハードドライブのパス が無効です
+	// invalid hard drive path
+}
+
 type CustomClassifier struct{}
 
 // Classify implements the Classifier interface.

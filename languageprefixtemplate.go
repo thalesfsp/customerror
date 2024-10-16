@@ -1,3 +1,8 @@
+// Template provides a flexible way to define error messages in different
+// languages.
+//
+// SEE: `i18n.md` file for more information.
+
 package customerror
 
 import (
@@ -6,25 +11,23 @@ import (
 	"sync"
 )
 
-//////
-// Consts, vars, and types.
-//////
-
-// Error types.
+// These are the built-in languages supported by the error handling system, and
+// their respective default error message.
 const (
-	FailedTo ErrorType = "failed to"
-	Invalid  ErrorType = "invalid"
-	Missing  ErrorType = "missing"
-	NotFound ErrorType = "not found"
-	Required ErrorType = "required"
+	FailedTo ErrorType = "failed to" // Indicates a failure to perform an action
+	Invalid  ErrorType = "invalid"   // Denotes an invalid input or state
+	Missing  ErrorType = "missing"   // Signifies a missing required element
+	NotFound ErrorType = "not found" // Indicates that a requested resource was not found
+	Required ErrorType = "required"  // Denotes a required element that was not provided
 )
 
-// Singleton.
+// Singleton variables and error instances.
 var (
 	once                      sync.Once
 	singletonLanguageErrorMap LanguageErrorMap
 
-	// ErrTemplateNotFound is returned when a template isn't found in the map.
+	// ErrTemplateNotFound is returned when a requested error template is not
+	// found in the map.
 	ErrTemplateNotFound = NewNotFoundError(fmt.Sprintf(
 		"%s. %s. Built-in languages: %s.",
 		"template",
@@ -32,48 +35,40 @@ var (
 		strings.Join(BuiltInLanguages, ", "),
 	), WithErrorCode("CE_ERR_TEMPLATE_NOT_FOUND"))
 
-	// ErrLanguageNotFound is returned when a language isn't found in the map.
+	// ErrLanguageNotFound is returned when a requested language is not supported.
 	ErrLanguageNotFound = NewNotFoundError("language. Please set one using `SetErrorPrefixMap`", WithErrorCode("CE_ERR_LANGUAGE_NOT_FOUND"))
 )
 
+// Type definitions for the error handling system.
 type (
-	// ErrorType is the type of the error.
+	// ErrorType represents the category or nature of an error.
 	ErrorType string
 
-	// LanguageErrorMap is a map of language to types of errors.
+	// LanguageErrorMap is a thread-safe map storing error templates for
+	// different languages.
 	LanguageErrorMap = *sync.Map
 
-	// ErrorPrefixMap is a map of types of errors to prefixes templates such as
-	// "missing %s", "%s required", "%s invalid", etc.
+	// ErrorPrefixMap is a thread-safe map storing error prefix templates for
+	// different error types.
 	ErrorPrefixMap = *sync.Map
 )
 
-//////
-// Methods.
-//////
-
-// String implements the Stringer interface.
+// String implements the Stringer interface for ErrorType.
 func (e ErrorType) String() string {
 	return string(e)
 }
 
-//////
-// Exported functionalities.
-//////
-
-// GetLanguageErrorMap returns the language prefix template map.
+// GetLanguageErrorMap returns the singleton instance of LanguageErrorMap.
+// It initializes the map with built-in languages and their respective error
+// templates.
 //
 //nolint:gosmopolitan
 func GetLanguageErrorMap() LanguageErrorMap {
 	once.Do(func() {
 		languageErrorTypeMap := &sync.Map{}
 
-		//////
-		// English.
-		//////
-
+		// Initialize error templates for English
 		enErrorTypePrefixTemplateMap := &sync.Map{}
-
 		enErrorTypePrefixTemplateMap.Store(FailedTo, "failed to %s")
 		enErrorTypePrefixTemplateMap.Store(Invalid, "invalid %s")
 		enErrorTypePrefixTemplateMap.Store(Missing, "missing %s")
@@ -87,12 +82,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		languageErrorTypeMap.Store(enLanguage, enErrorTypePrefixTemplateMap)
 
-		//////
-		// Chinese.
-		//////
-
+		// Initialize error templates for Chinese
 		chErrorTypePrefixTemplateMap := &sync.Map{}
-
 		chErrorTypePrefixTemplateMap.Store(FailedTo, "无法 %s")
 		chErrorTypePrefixTemplateMap.Store(Invalid, "无效的 %s")
 		chErrorTypePrefixTemplateMap.Store(Missing, "缺少 %s")
@@ -106,12 +97,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		languageErrorTypeMap.Store(chLanguage, chErrorTypePrefixTemplateMap)
 
-		//////
-		// Spanish.
-		//////
-
+		// Initialize error templates for Spanish
 		esErrorTypePrefixTemplateMap := &sync.Map{}
-
 		esErrorTypePrefixTemplateMap.Store(FailedTo, "error al %s")
 		esErrorTypePrefixTemplateMap.Store(Invalid, "%s inválido")
 		esErrorTypePrefixTemplateMap.Store(Missing, "falta %s")
@@ -125,12 +112,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		languageErrorTypeMap.Store(esLanguage, esErrorTypePrefixTemplateMap)
 
-		//////
-		// French.
-		//////
-
+		// Initialize error templates for French
 		frErrorTypePrefixTemplateMap := &sync.Map{}
-
 		frErrorTypePrefixTemplateMap.Store(FailedTo, "échec de %s")
 		frErrorTypePrefixTemplateMap.Store(Invalid, "%s invalide")
 		frErrorTypePrefixTemplateMap.Store(Missing, "%s manquant")
@@ -144,12 +127,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		languageErrorTypeMap.Store(frLanguage, frErrorTypePrefixTemplateMap)
 
-		//////
-		// German.
-		//////
-
+		// Initialize error templates for German
 		deErrorTypePrefixTemplateMap := &sync.Map{}
-
 		deErrorTypePrefixTemplateMap.Store(FailedTo, "fehlgeschlagen bei %s")
 		deErrorTypePrefixTemplateMap.Store(Invalid, "ungültig %s")
 		deErrorTypePrefixTemplateMap.Store(Missing, "fehlend %s")
@@ -163,12 +142,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		languageErrorTypeMap.Store(deLanguage, deErrorTypePrefixTemplateMap)
 
-		//////
-		// Italian.
-		//////
-
+		// Initialize error templates for Italian
 		itErrorTypePrefixTemplateMap := &sync.Map{}
-
 		itErrorTypePrefixTemplateMap.Store(FailedTo, "impossible %s")
 		itErrorTypePrefixTemplateMap.Store(Invalid, "%s non valido")
 		itErrorTypePrefixTemplateMap.Store(Missing, "mancante %s")
@@ -182,12 +157,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		languageErrorTypeMap.Store(itLanguage, itErrorTypePrefixTemplateMap)
 
-		//////
-		// Brazilian Portuguese.
-		//////
-
+		// Initialize error templates for Brazilian Portuguese
 		ptBrErrorTypePrefixTemplateMap := &sync.Map{}
-
 		ptBrErrorTypePrefixTemplateMap.Store(FailedTo, "falhou %s")
 		ptBrErrorTypePrefixTemplateMap.Store(Invalid, "%s é inválido")
 		ptBrErrorTypePrefixTemplateMap.Store(Missing, "faltando %s")
@@ -207,7 +178,8 @@ func GetLanguageErrorMap() LanguageErrorMap {
 	return singletonLanguageErrorMap
 }
 
-// GetLanguageErrorTypeMap returns the language error type map.
+// GetLanguageErrorTypeMap retrieves the ErrorPrefixMap for a specific language.
+// It returns an error if the language is not supported.
 func GetLanguageErrorTypeMap(language string) (LanguageErrorMap, error) {
 	l, err := NewLanguage(language)
 	if err != nil {
@@ -222,7 +194,8 @@ func GetLanguageErrorTypeMap(language string) (LanguageErrorMap, error) {
 	return errorTypeMap.(LanguageErrorMap), nil
 }
 
-// GetTemplate returns the template for the given language and error type.
+// GetTemplate retrieves the error template for a specific language and error type.
+// It returns an error if either the language or the template is not found.
 func GetTemplate(language, errorType string) (string, error) {
 	languageErrorTypeMap, err := GetLanguageErrorTypeMap(language)
 	if err != nil {
@@ -237,9 +210,9 @@ func GetTemplate(language, errorType string) (string, error) {
 	return template.(string), nil
 }
 
-// SetErrorPrefixMap sets the error type prefix template map for the
-// given language.
-func SetErrorPrefixMap(
+// AddNewLanguage allows setting a new language to the error handling system,
+// seeting the built-in error templates for each error type.
+func AddNewLanguage(
 	language string,
 	errorTypePrefixTemplateMap ErrorPrefixMap,
 ) error {
@@ -253,7 +226,19 @@ func SetErrorPrefixMap(
 	return nil
 }
 
-// NewErrorPrefixMap returns a new error type prefix template map.
+// MustAddNewLanguage is a wrapper around AddNewLanguage that panics if an error
+// occurs.
+func MustAddNewLanguage(
+	language string,
+	errorTypePrefixTemplateMap ErrorPrefixMap,
+) {
+	if err := AddNewLanguage(language, errorTypePrefixTemplateMap); err != nil {
+		panic(err)
+	}
+}
+
+// NewErrorPrefixMap creates a new ErrorPrefixMap with the provided templates for each error type.
+// This function is useful when setting up custom error templates for a new language.
 func NewErrorPrefixMap(
 	failedToTemplate,
 	invalidTemplate,

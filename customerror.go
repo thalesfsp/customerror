@@ -398,8 +398,10 @@ func (cE *CustomError) FormatError(errorType string, opts ...Option) *CustomErro
 	}
 
 	if finalCE.language != "" {
-		template, err := GetTemplate(string(finalCE.language), string(FailedTo))
+		// Get the template by the language.
+		template, err := GetTemplate(string(finalCE.language), errorType)
 		if err != nil {
+			// Get the template by the root language.
 			template2, err := GetTemplate(finalCE.language.GetRoot(), errorType)
 			if err != nil {
 				panic(err)

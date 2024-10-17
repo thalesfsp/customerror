@@ -3,6 +3,7 @@ module github.com/thalesfsp/customerror
 go 1.19
 
 require (
+	github.com/eapache/go-resiliency v1.7.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/stretchr/testify v1.8.4
@@ -10,7 +11,6 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.5 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect

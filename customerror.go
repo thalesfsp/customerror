@@ -665,14 +665,14 @@ func IsCustomError(err error) bool {
 }
 
 // To converts the error to a `CustomError`.
-func To(err error) *CustomError {
+func To(err error) (*CustomError, bool) {
 	cE, ok := err.(*CustomError)
 
 	if !ok {
-		return nil
+		return nil, false
 	}
 
-	return cE
+	return cE, true
 }
 
 // IsHTTPStatus checks if the error is a `CustomError` with the

@@ -439,3 +439,26 @@ func Test_CustomError_String(t *testing.T) {
 
 	assert.Equal(t, expected, s.String())
 }
+
+func Test_From(t *testing.T) {
+	// Helper function that receives a "throw" custom error and return it as an
+	// error.
+	throwIt := func(err error) error {
+		return err
+	}
+
+	// Create a custom error that will be modified later.
+	cE := New("An error occurred", WithErrorCode("E1010"), WithStatusCode(http.StatusBadRequest))
+
+	// Simulate throwing it.
+	err := throwIt(cE)
+
+	// Ensure the message.
+	assert.Equal(t, "E1010: An error occurred", cE.Error())
+
+	// Modify the error.
+	newErr := From(err, WithErrorCode("E1011"))
+
+	// Ensure changes are applied.
+	assert.Equal(t, "E1011: An error occurred", newErr.Error())
+}

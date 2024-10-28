@@ -675,6 +675,19 @@ func To(err error) (*CustomError, bool) {
 	return cE, true
 }
 
+// From modifies the error with the given options.
+func From(err error, opts ...Option) error {
+	if cE, ok := To(err); ok {
+		for _, opt := range opts {
+			opt(cE)
+		}
+
+		return cE
+	}
+
+	return err
+}
+
 // IsHTTPStatus checks if the error is a `CustomError` with the
 // specified HTTP status code.
 func IsHTTPStatus(err error, statusCode int) bool {

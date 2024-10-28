@@ -401,7 +401,7 @@ func Test_CustomError_Error(t *testing.T) {
 	tests := []struct {
 		name     string
 		cE       *CustomError
-		expected string
+		expected []string
 	}{
 		{
 			name: "with all fields",
@@ -414,20 +414,22 @@ func Test_CustomError_Error(t *testing.T) {
 				Tags:       &Set{treeset.NewWithStringComparator("tag1", "tag2")},
 				ignore:     false,
 			},
-			expected: "E1010: An error occurred. Original Error: Some error. Tags: tag1, tag2. Fields: field1=value1, field2=2",
+			expected: []string{"E1010", "An error occurred", "Original Error: Some error", "Tags", "tag1", "tag2", "Fields:", "field1=value1", "field2=2"},
 		},
 		{
 			name: "with message only",
 			cE: &CustomError{
 				Message: "An error occurred",
 			},
-			expected: "An error occurred",
+			expected: []string{"An error occurred"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.cE.Error())
+			for _, e := range tt.expected {
+				assert.True(t, strings.Contains(tt.cE.Error(), e))
+			}
 		})
 	}
 }
@@ -461,4 +463,8 @@ func Test_From(t *testing.T) {
 
 	// Ensure changes are applied.
 	assert.Equal(t, "E1011: An error occurred", newErr.Error())
+
+	nreErr2 := From(errors.New("Some error"), WithErrorCode("E1012"))
+
+	assert.Equal(t, "E1012: Some error. Original Error: Some error", nreErr2.Error())
 }

@@ -615,11 +615,6 @@ func newInternal(opts ...Option) *CustomError {
 		cE.Message = cE.Code
 	}
 
-	// Should be able to programatically ignore errors (`WithIgnoreFunc`).
-	if cE.ignore {
-		return nil
-	}
-
 	return cE
 }
 
@@ -629,16 +624,21 @@ func newInternal(opts ...Option) *CustomError {
 func New(message string, opts ...Option) error {
 	cE := newInternal(prependOptions(opts, WithMessage(message))...)
 
-	if cE == nil {
+	// Should be able to programatically ignore errors (`WithIgnoreFunc`).
+	if cE.ignore {
 		return nil
+	}
+
+	if cE == nil {
+		log.Panicln("Failed to create custom error.")
 	}
 
 	if err := validator.New().Struct(cE); err != nil {
 		if os.Getenv("CUSTOMERROR_ENVIRONMENT") == "testing" {
 			log.Panicf("Invalid custom error. %s\n", err)
-		} else {
-			log.Fatalf("Invalid custom error. %s\n", err)
 		}
+
+		log.Fatalf("Invalid custom error. %s\n", err)
 
 		return nil
 	}
@@ -654,7 +654,18 @@ func New(message string, opts ...Option) error {
 // - `NewRequiredError`
 // - `NewHTTPError`.
 func Factory(message string, opts ...Option) *CustomError {
-	return newInternal(prependOptions(opts, WithMessage(message))...)
+	cE := newInternal(prependOptions(opts, WithMessage(message))...)
+
+	// Should be able to programatically ignore errors (`WithIgnoreFunc`).
+	if cE.ignore {
+		return nil
+	}
+
+	if cE == nil {
+		log.Panicln("Failed to create custom error.")
+	}
+
+	return cE
 }
 
 // IsCustomError checks if the error is a `CustomError`.
@@ -675,7 +686,8 @@ func To(err error) (*CustomError, bool) {
 	return cE, true
 }
 
-// From modifies the error with the given options.
+// From modifies the error with the given options, if `err` isn't a custom error
+// it then returns a new custom error with the given options.
 func From(err error, opts ...Option) error {
 	if cE, ok := To(err); ok {
 		for _, opt := range opts {
@@ -685,7 +697,10 @@ func From(err error, opts ...Option) error {
 		return cE
 	}
 
-	return err
+	// WithError properly deals with Golang errors (unwrapping, etc).
+	opts = append(opts, WithError(err))
+
+	return New(err.Error(), opts...)
 }
 
 // IsHTTPStatus checks if the error is a `CustomError` with the

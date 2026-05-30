@@ -11,7 +11,7 @@ import (
 //////
 
 const (
-	Chinese    Language = "ch"
+	Chinese    Language = "zh"
 	English    Language = "en"
 	French     Language = "fr"
 	German     Language = "de"
@@ -43,8 +43,10 @@ var (
 	}
 
 	// LanguageRegex is a regular expression to validate language codes based on
-	// ISO 639-1 and ISO 3166-1 alpha-2.
-	LanguageRegex = regexp.MustCompile("^[a-z]{2}(-[A-Z]{2})?$|default")
+	// ISO 639-1 and ISO 3166-1 alpha-2. The special value "default" is also
+	// accepted. Every alternative is fully anchored, so partial matches such as
+	// "mydefault" are correctly rejected.
+	LanguageRegex = regexp.MustCompile("^[a-z]{2}(-[A-Z]{2})?$|^default$")
 )
 
 type (

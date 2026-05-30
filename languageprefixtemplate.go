@@ -62,7 +62,7 @@ func (e ErrorType) String() string {
 // It initializes the map with built-in languages and their respective error
 // templates.
 //
-//nolint:gosmopolitan
+//nolint:gosmopolitan,misspell
 func GetLanguageErrorMap() LanguageErrorMap {
 	once.Do(func() {
 		languageErrorTypeMap := &sync.Map{}
@@ -144,7 +144,7 @@ func GetLanguageErrorMap() LanguageErrorMap {
 
 		// Initialize error templates for Italian
 		itErrorTypePrefixTemplateMap := &sync.Map{}
-		itErrorTypePrefixTemplateMap.Store(FailedTo, "impossible %s")
+		itErrorTypePrefixTemplateMap.Store(FailedTo, "impossibile %s")
 		itErrorTypePrefixTemplateMap.Store(Invalid, "%s non valido")
 		itErrorTypePrefixTemplateMap.Store(Missing, "mancante %s")
 		itErrorTypePrefixTemplateMap.Store(Required, "%s richiesto")
@@ -210,8 +210,9 @@ func GetTemplate(language, errorType string) (string, error) {
 	return template.(string), nil
 }
 
-// AddNewLanguage allows setting a new language to the error handling system,
-// seeting the built-in error templates for each error type.
+// AddNewLanguage registers (or updates) a language in the error handling
+// system, setting the built-in error templates for each error type. If the
+// language already exists, its templates are overwritten.
 func AddNewLanguage(
 	language string,
 	errorTypePrefixTemplateMap ErrorPrefixMap,
@@ -221,7 +222,7 @@ func AddNewLanguage(
 		return err
 	}
 
-	GetLanguageErrorMap().LoadOrStore(l, errorTypePrefixTemplateMap)
+	GetLanguageErrorMap().Store(l, errorTypePrefixTemplateMap)
 
 	return nil
 }

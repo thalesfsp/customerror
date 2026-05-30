@@ -28,14 +28,17 @@ import (
 type Option func(s *CustomError)
 
 // Prepend options.
+//
+// It returns a brand-new slice with `item` first, followed by `source`. A
+// fresh slice is always allocated so the caller's backing array is never
+// mutated (avoids append/copy aliasing bugs).
 func prependOptions(source []Option, item Option) []Option {
-	source = append(source, nil)
+	result := make([]Option, 0, len(source)+1)
 
-	copy(source[1:], source)
+	result = append(result, item)
+	result = append(result, source...)
 
-	source[0] = item
-
-	return source
+	return result
 }
 
 //////
@@ -120,14 +123,18 @@ func WithTag(tag ...string) Option {
 	}
 }
 
-// WithFields allows to set fields for the error.
+// WithFields allows to set fields for the error. Existing fields are preserved;
+// keys present in `fields` are added or overwritten (consistent with
+// `WithField`).
 func WithFields(fields map[string]interface{}) Option {
 	return func(cE *CustomError) {
 		if cE.Fields == nil {
 			cE.Fields = &sync.Map{}
 		}
 
-		cE.Fields = mapToSyncMap(fields)
+		for k, v := range fields {
+			cE.Fields.Store(k, v)
+		}
 	}
 }
 
@@ -151,7 +158,9 @@ func WithLanguage(lang string) Option {
 	return func(cE *CustomError) {
 		l, err := NewLanguage(lang)
 		if err != nil {
-			panic(err)
+			// Invalid language code: ignore it and keep the default message
+			// (as documented) instead of panicking.
+			return
 		}
 
 		if cE.LanguageMessageMap == nil {
@@ -184,15 +193,19 @@ func WithLanguage(lang string) Option {
 // languages, combinations, and their translations.
 //
 // SEE: `i18n.md` file for more information.
+//
+// NOTE: If `lang` is not a valid language code, the translation is ignored
+// (not stored) instead of panicking.
 func WithTranslation(lang, message string) Option {
 	return func(cE *CustomError) {
-		if cE.LanguageMessageMap == nil {
-			cE.LanguageMessageMap = &sync.Map{}
-		}
-
 		l, err := NewLanguage(lang)
 		if err != nil {
-			panic(err)
+			// Invalid language code: ignore it instead of panicking.
+			return
+		}
+
+		if cE.LanguageMessageMap == nil {
+			cE.LanguageMessageMap = &sync.Map{}
 		}
 
 		cE.LanguageMessageMap.Store(l, message)

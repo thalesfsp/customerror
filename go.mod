@@ -1,6 +1,6 @@
 module github.com/thalesfsp/customerror
 
-go 1.19
+go 1.21
 
 require (
 	github.com/eapache/go-resiliency v1.7.0

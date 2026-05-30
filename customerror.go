@@ -9,13 +9,34 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
+	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/go-playground/validator/v10"
 )
+
+//////
+// Consts, vars, and types.
+//////
+
+// validate is the shared, reusable validator instance. The validator caches
+// struct metadata internally, so a single instance is meant to be reused
+// across calls (and is safe for concurrent use).
+var validate = validator.New()
+
+// reservedJSONKeys are the top-level keys owned by the CustomError structure
+// when marshaling to JSON. User-provided fields must not be allowed to clobber
+// them.
+var reservedJSONKeys = map[string]struct{}{
+	"message":    {},
+	"code":       {},
+	"tags":       {},
+	"retryable":  {},
+	"retried":    {},
+	"statusCode": {},
+}
 
 //////
 // Helpers.
@@ -119,52 +140,53 @@ func Copy(src, target *CustomError) *CustomError {
 	return target
 }
 
-// Process fields and add them to the error message.
+// Process fields and add them to the error message. If `fields` is nil or
+// empty, the message is returned unchanged (no dangling ". Fields:").
 func processFields(
 	errMsg string,
 	fields *sync.Map,
 ) string {
-	if fields != nil {
-		errMsg = fmt.Sprintf("%s. Fields:", errMsg)
-
-		fields.Range(func(k, v interface{}) bool {
-			errMsg = fmt.Sprintf("%s %s=%v,", errMsg, k, v)
-
-			return true
-		})
-
-		errMsg = strings.TrimSuffix(errMsg, ",")
+	if fields == nil {
+		return errMsg
 	}
 
-	return errMsg
+	var b strings.Builder
+
+	fields.Range(func(k, v interface{}) bool {
+		fmt.Fprintf(&b, " %v=%v,", k, v)
+
+		return true
+	})
+
+	if b.Len() == 0 {
+		return errMsg
+	}
+
+	return fmt.Sprintf("%s. Fields:%s", errMsg, strings.TrimSuffix(b.String(), ","))
 }
 
-// mapToSyncMap converts a map to a sync.Map.
-func mapToSyncMap(m map[string]interface{}) *sync.Map {
-	sm := &sync.Map{}
-
-	for k, v := range m {
-		sm.Store(k, v)
+// addUserFieldsToJSON copies user-provided fields into the JSON map `temp`,
+// skipping empty keys, nil values, and any key reserved by the CustomError
+// structure (so user fields can never clobber structural JSON keys).
+func addUserFieldsToJSON(temp map[string]interface{}, fields *sync.Map) {
+	if fields == nil {
+		return
 	}
 
-	return sm
-}
-
-// syncMapToMap converts a sync.Map to a map.
-func syncMapToMap(sm *sync.Map) map[string]interface{} {
-	m := make(map[string]interface{})
-
-	if sm != nil {
-		sm.Range(func(k, v interface{}) bool {
-			if str, ok := k.(string); ok {
-				m[str] = v
-			}
-
+	fields.Range(func(k, v interface{}) bool {
+		key, ok := k.(string)
+		if !ok || key == "" || v == nil {
 			return true
-		})
-	}
+		}
 
-	return m
+		if _, reserved := reservedJSONKeys[key]; reserved {
+			return true
+		}
+
+		temp[key] = v
+
+		return true
+	})
 }
 
 // Set is a wrapper around the treeset.Set, providing a collection
@@ -206,10 +228,6 @@ type CustomError struct {
 	// Message in different languages.
 	LanguageMessageMap LanguageMessageMap `json:"languageMessageMap"`
 
-	// LanguageErrorTypeMap is a map of language prefixes to templates such
-	// as "missing %s", "%s required", "%s invalid", etc.
-	LanguageErrorTypeMap LanguageErrorMap `json:"languageErrorTypeMap"`
-
 	// Retryable indicates if the error is retryable.
 	Retryable bool `json:"retryable"`
 
@@ -250,7 +268,7 @@ func (cE *CustomError) Error() string {
 		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
 	}
 
-	if cE.Tags != nil {
+	if cE.Tags != nil && !cE.Tags.Empty() {
 		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, cE.Tags.String())
 	}
 
@@ -270,6 +288,17 @@ func (cE *CustomError) Error() string {
 //
 //nolint:errorlint
 func (cE *CustomError) Is(err error) bool {
+	// Preserve the original nil semantics.
+	if cE.Err == nil || err == nil {
+		return cE.Err == err
+	}
+
+	// Guard against panics when comparing non-comparable error values (e.g. an
+	// error whose dynamic type contains a slice or a map).
+	if !reflect.TypeOf(cE.Err).Comparable() || !reflect.TypeOf(err).Comparable() {
+		return false
+	}
+
 	return cE.Err == err
 }
 
@@ -308,19 +337,8 @@ func (cE *CustomError) MarshalJSON() ([]byte, error) {
 		temp["retried"] = cE.Retried
 	}
 
-	if cE.Fields != nil {
-		// Convert the sync.Map to a regular map so that we can iterate over its keys.
-		fields := syncMapToMap(cE.Fields)
-
-		// Populate the fields of the temporary map.
-		if len(fields) > 0 {
-			for k, v := range fields {
-				if k != "" && v != nil {
-					temp[k] = v
-				}
-			}
-		}
-	}
+	// Add user fields, skipping any that would clobber the structural keys.
+	addUserFieldsToJSON(temp, cE.Fields)
 
 	if cE.StatusCode > 0 {
 		temp["statusCode"] = cE.StatusCode
@@ -369,7 +387,7 @@ func (cE *CustomError) APIError() string {
 		errMsg = fmt.Errorf("%s. Original Error: %w", errMsg, cE.Err).Error()
 	}
 
-	if cE.Tags != nil {
+	if cE.Tags != nil && !cE.Tags.Empty() {
 		errMsg = fmt.Sprintf("%s. Tags: %s", errMsg, cE.Tags.String())
 	}
 
@@ -401,13 +419,16 @@ func (cE *CustomError) FormatError(errorType string, opts ...Option) *CustomErro
 		// Get the template by the language.
 		template, err := GetTemplate(string(finalCE.language), errorType)
 		if err != nil {
-			// Get the template by the root language.
-			template2, err := GetTemplate(finalCE.language.GetRoot(), errorType)
-			if err != nil {
-				panic(err)
+			// Fall back to the root language (e.g. "pt-BR" -> "pt").
+			rootTemplate, rootErr := GetTemplate(finalCE.language.GetRoot(), errorType)
+			if rootErr != nil {
+				// No template available for this language/error type. Degrade
+				// gracefully by returning the (unprefixed) message instead of
+				// panicking.
+				return finalCE
 			}
 
-			template = template2
+			template = rootTemplate
 		}
 
 		finalCE.Message = fmt.Sprintf(template, finalCE.Message)
@@ -431,9 +452,24 @@ func (cE *CustomError) FormatError(errorType string, opts ...Option) *CustomErro
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewFailedToError(opts ...Option) error {
 	finalCE := cE.FormatError(string(FailedTo), opts...)
+	if finalCE == nil {
+		return nil
+	}
+
+	// Honor WithIgnoreFunc/WithIgnoreString consistently.
+	if finalCE.ignore {
+		return nil
+	}
 
 	if finalCE.language == "" {
-		finalCE = Copy(NewFailedToError(finalCE.Message, opts...).(*CustomError), finalCE)
+		// The prefixed message may itself trigger an ignore option, in which
+		// case the inner constructor returns nil; guard the type assertion.
+		inner := NewFailedToError(finalCE.Message, opts...)
+		if inner == nil {
+			return nil
+		}
+
+		finalCE = Copy(inner.(*CustomError), finalCE)
 
 		return finalCE
 	}
@@ -450,9 +486,24 @@ func (cE *CustomError) NewFailedToError(opts ...Option) error {
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewInvalidError(opts ...Option) error {
 	finalCE := cE.FormatError(string(Invalid), opts...)
+	if finalCE == nil {
+		return nil
+	}
+
+	// Honor WithIgnoreFunc/WithIgnoreString consistently.
+	if finalCE.ignore {
+		return nil
+	}
 
 	if finalCE.language == "" {
-		finalCE = Copy(NewInvalidError(finalCE.Message, opts...).(*CustomError), finalCE)
+		// The prefixed message may itself trigger an ignore option, in which
+		// case the inner constructor returns nil; guard the type assertion.
+		inner := NewInvalidError(finalCE.Message, opts...)
+		if inner == nil {
+			return nil
+		}
+
+		finalCE = Copy(inner.(*CustomError), finalCE)
 
 		return finalCE
 	}
@@ -469,9 +520,24 @@ func (cE *CustomError) NewInvalidError(opts ...Option) error {
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewMissingError(opts ...Option) error {
 	finalCE := cE.FormatError(Missing.String(), opts...)
+	if finalCE == nil {
+		return nil
+	}
+
+	// Honor WithIgnoreFunc/WithIgnoreString consistently.
+	if finalCE.ignore {
+		return nil
+	}
 
 	if finalCE.language == "" {
-		finalCE = Copy(NewMissingError(finalCE.Message, opts...).(*CustomError), finalCE)
+		// The prefixed message may itself trigger an ignore option, in which
+		// case the inner constructor returns nil; guard the type assertion.
+		inner := NewMissingError(finalCE.Message, opts...)
+		if inner == nil {
+			return nil
+		}
+
+		finalCE = Copy(inner.(*CustomError), finalCE)
 
 		return finalCE
 	}
@@ -488,9 +554,24 @@ func (cE *CustomError) NewMissingError(opts ...Option) error {
 // NOTE: Status code can be redefined, call `SetStatusCode`.
 func (cE *CustomError) NewRequiredError(opts ...Option) error {
 	finalCE := cE.FormatError(Required.String(), opts...)
+	if finalCE == nil {
+		return nil
+	}
+
+	// Honor WithIgnoreFunc/WithIgnoreString consistently.
+	if finalCE.ignore {
+		return nil
+	}
 
 	if finalCE.language == "" {
-		finalCE = Copy(NewRequiredError(finalCE.Message, opts...).(*CustomError), finalCE)
+		// The prefixed message may itself trigger an ignore option, in which
+		// case the inner constructor returns nil; guard the type assertion.
+		inner := NewRequiredError(finalCE.Message, opts...)
+		if inner == nil {
+			return nil
+		}
+
+		finalCE = Copy(inner.(*CustomError), finalCE)
 
 		return finalCE
 	}
@@ -509,21 +590,33 @@ func (cE *CustomError) NewHTTPError(statusCode int, opts ...Option) error {
 		return nil
 	}
 
-	if cE.StatusCode == 0 {
-		cE.StatusCode = statusCode
+	// Work on a copy so the receiver (often a reusable factory/catalog error)
+	// is never mutated.
+	finalCE := Copy(cE, &CustomError{})
+
+	// Use the receiver's status code if it was explicitly set, otherwise fall
+	// back to the provided one.
+	if finalCE.StatusCode == 0 {
+		finalCE.StatusCode = statusCode
 	}
 
-	finalCE := &CustomError{}
+	httpErr := NewHTTPError(finalCE.StatusCode, opts...)
+	if httpErr == nil {
+		// Ignored via WithIgnoreFunc/WithIgnoreString.
+		return nil
+	}
 
-	finalCE = Copy(cE, finalCE)
-
-	httpCE := NewHTTPError(finalCE.StatusCode, opts...).(*CustomError)
+	httpCE := httpErr.(*CustomError)
 
 	finalErrorMessage := httpCE.Message
 
 	// Apply options.
 	for _, opt := range opts {
 		opt(finalCE)
+	}
+
+	if finalCE.ignore {
+		return nil
 	}
 
 	finalCE.Message = finalErrorMessage
@@ -549,7 +642,18 @@ func (cE *CustomError) New(opts ...Option) error {
 		opt(finalCE)
 	}
 
-	finalCE = Copy(New(finalCE.Message, opts...).(*CustomError), finalCE)
+	// Honor WithIgnoreFunc/WithIgnoreString and guard the type assertion in
+	// case the inner constructor ignored the error (returned nil).
+	if finalCE.ignore {
+		return nil
+	}
+
+	inner := New(finalCE.Message, opts...)
+	if inner == nil {
+		return nil
+	}
+
+	finalCE = Copy(inner.(*CustomError), finalCE)
 
 	return finalCE
 }
@@ -558,17 +662,57 @@ func (cE *CustomError) New(opts ...Option) error {
 // Exported functionalities.
 //////
 
-// Wrap `customError` around `errors`.
+// wrappedError is the error type returned by Wrap. It preserves the identity of
+// every wrapped error (so errors.Is/errors.As work for all of them) while
+// keeping a human-readable, stable message format.
+type wrappedError struct {
+	// customError is the primary error being wrapped.
+	customError error
+
+	// errs are the additional errors wrapped around customError.
+	errs []error
+}
+
+// Error implements the error interface, preserving the message format:
+// "<customError>. Wrapped Error(s): <e1>. <e2>...".
+func (w *wrappedError) Error() string {
+	errMsgs := make([]string, 0, len(w.errs))
+
+	for _, err := range w.errs {
+		errMsgs = append(errMsgs, err.Error())
+	}
+
+	return fmt.Sprintf("%s. Wrapped Error(s): %s", w.customError.Error(), strings.Join(errMsgs, ". "))
+}
+
+// Unwrap returns all wrapped errors, enabling errors.Is/errors.As to match any
+// of them (Go 1.20+ multi-error unwrapping).
+func (w *wrappedError) Unwrap() []error {
+	all := make([]error, 0, len(w.errs)+1)
+
+	all = append(all, w.customError)
+	all = append(all, w.errs...)
+
+	return all
+}
+
+// Wrap wraps `customError` together with the additional `errors`. The returned
+// error preserves the identity of every wrapped error, so errors.Is and
+// errors.As match against `customError` and each of `errors`. Nil errors are
+// ignored.
 func Wrap(customError error, errors ...error) error {
-	errMsgs := []string{}
+	nonNil := make([]error, 0, len(errors))
 
 	for _, err := range errors {
 		if err != nil {
-			errMsgs = append(errMsgs, err.Error())
+			nonNil = append(nonNil, err)
 		}
 	}
 
-	return fmt.Errorf("%w. Wrapped Error(s): %s", customError, strings.Join(errMsgs, ". "))
+	return &wrappedError{
+		customError: customError,
+		errs:        nonNil,
+	}
 }
 
 // NewChildError creates a new `CustomError` with the same fields and tags of
@@ -620,7 +764,10 @@ func newInternal(opts ...Option) *CustomError {
 
 // New creates a new validated custom error returning it as en `error`.
 //
-//nolint:revive
+// NOTE: Creating an error with invalid attributes (for example, an empty
+// message) is a programming error. In that case New panics (recoverable)
+// rather than terminating the host process - a library must never call
+// os.Exit on its caller's behalf.
 func New(message string, opts ...Option) error {
 	cE := newInternal(prependOptions(opts, WithMessage(message))...)
 
@@ -629,18 +776,8 @@ func New(message string, opts ...Option) error {
 		return nil
 	}
 
-	if cE == nil {
-		log.Panicln("Failed to create custom error.")
-	}
-
-	if err := validator.New().Struct(cE); err != nil {
-		if os.Getenv("CUSTOMERROR_ENVIRONMENT") == "testing" {
-			log.Panicf("Invalid custom error. %s\n", err)
-		}
-
-		log.Fatalf("Invalid custom error. %s\n", err)
-
-		return nil
+	if err := validate.Struct(cE); err != nil {
+		log.Panicf("Invalid custom error. %s\n", err)
 	}
 
 	return cE
@@ -659,10 +796,6 @@ func Factory(message string, opts ...Option) *CustomError {
 	// Should be able to programatically ignore errors (`WithIgnoreFunc`).
 	if cE.ignore {
 		return nil
-	}
-
-	if cE == nil {
-		log.Panicln("Failed to create custom error.")
 	}
 
 	return cE
@@ -686,15 +819,22 @@ func To(err error) (*CustomError, bool) {
 	return cE, true
 }
 
-// From modifies the error with the given options, if `err` isn't a custom error
-// it then returns a new custom error with the given options.
+// From returns a copy of `err` with the given options applied. If `err` is a
+// `CustomError`, the original is left untouched (not mutated) and a modified
+// copy is returned - this makes it safe to use with shared sentinel errors. If
+// `err` isn't a custom error, a new custom error wrapping it (with the given
+// options) is returned.
 func From(err error, opts ...Option) error {
 	if cE, ok := To(err); ok {
+		// Operate on a copy so the original error (which may be a shared
+		// sentinel) is never mutated.
+		finalCE := Copy(cE, &CustomError{})
+
 		for _, opt := range opts {
-			opt(cE)
+			opt(finalCE)
 		}
 
-		return cE
+		return finalCE
 	}
 
 	// WithError properly deals with Golang errors (unwrapping, etc).

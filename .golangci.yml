@@ -3,81 +3,81 @@
 # license that can be found in the LICENSE file.
 
 ---
+version: "2"
+
 run:
   timeout: 1m
-  skip-files:
-    - internal/*
 
 linters:
-  enable-all: true
+  default: all
   disable:
     - wrapcheck
     - testpackage
     - gochecknoglobals
-    - exhaustivestruct
     - exhaustruct
     - paralleltest
     - godox
     - cyclop
     - tagliatelle
-    - goerr113
+    - err113 # renamed from goerr113
     - varnamelen
     - errorlint
     - forcetypeassert
     - perfsprint
     - depguard
     - testifylint
-  fast: false
+    # Linters introduced in golangci-lint v2 that are not part of this repo's
+    # v1 baseline and conflict with its established idioms; kept off so the v2
+    # migration preserves the previous effective rule set.
+    - noinlineerr # idiomatic `if err := f(); err != nil` is used throughout
+    - funcorder # repo groups code via "//////" section dividers, not ctor-first
+    - wsl_v5 # superseded ruleset; `wsl` (below) preserves the prior behavior
+  settings:
+    funlen:
+      lines: 150
+      statements: 45
+  exclusions:
+    paths:
+      - internal/.*
+    rules:
+      - path: cmd/
+        linters:
+          - gochecknoinits
+          - mnd # renamed from gomnd
+          - forbidigo
+          - lll
+      - path: example_test.go
+        linters:
+          - lll
+          - dupword
+      - path: internal/http/
+        linters:
+          - unparam
+          - nlreturn
+      - path: _test\.go
+        linters:
+          - wsl
+          - nlreturn
+          - funlen
+          - dupl
+          - gocognit
+          - lll
+          - gosmopolitan # i18n test fixtures legitimately contain non-Latin text
+      - path: doc.go
+        linters:
+          - lll
+      - source: "json:"
+        linters:
+          - lll
+      - source: "Err"
+        linters:
+          - lll
+      - source: "//////"
+        linters:
+          - gocritic
+          - godot
 
-# Settings for specific linters
-linters-settings:
-  funlen:
-    lines: 150
-    statements: 45
-
-issues:
-  exclude-rules:
-    - path: cmd/
-      linters:
-        - gochecknoinits
-        - gomnd
-        - forbidigo
-        - lll
-
-    - path: example_test.go
-      linters:
-        - lll
-        - dupword
-
-    - path: internal/http/
-      linters:
-        - unparam
-        - nlreturn
-
-    - path: _test\.go
-      linters:
-        - scopelint
-        - wsl
-        - nlreturn
-        - funlen
-        - dupl
-        - gocognit
-        - nosnakecase
-        - lll
-
-    - path: doc.go
-      linters:
-        - lll
-
-    - linters:
-        - lll
-      source: "json:"
-
-    - linters:
-        - lll
-      source: "Err"
-
-    - linters:
-        - gocritic
-        - godot
-      source: "//////"
+formatters:
+  enable:
+    - gofmt
+    - goimports

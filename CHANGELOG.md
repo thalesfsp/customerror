@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-05-30
+### Changed
+- **BREAKING:** module path is now `github.com/thalesfsp/customerror/v2`.
+- **BREAKING:** minimum Go is now 1.25 (`go.mod` `go 1.25.0`); CI runs Go 1.25.
+- `From` returns a modified copy instead of mutating the original (safe for shared sentinels).
+- `WithLanguage`/`WithTranslation`/`FormatError` no longer panic on invalid input; they degrade gracefully.
+- `ErrorCode` validation is now strict/anchored: only letters, digits, and underscores are accepted.
+- `Catalog.Get`/`MustGet` apply the provided options and return a copy (the stored entry is never handed out or mutated).
+- `WithFields` merges into existing fields instead of replacing them.
+- `Wrap` preserves the identity of every wrapped error (`errors.Is`/`errors.As` match all of them).
+- Chinese language code corrected to ISO 639-1 `zh` (was `ch`); Italian "failed to" template spelling fixed.
+- Dependencies updated to latest; linting migrated to golangci-lint v2.
+
+### Removed
+- **BREAKING:** removed the unused exported `CustomError.LanguageErrorTypeMap` field.
+
+### Fixed
+- `New` no longer terminates the process (`log.Fatalf`/`os.Exit`) on invalid input; it panics (recoverable).
+- `NewHTTPError` (method) no longer mutates its receiver (no more "sticky" status code on reused factories).
+- `MarshalJSON` no longer lets user fields clobber structural keys (`code`, `message`, `statusCode`, `tags`, `retryable`, `retried`).
+- `Error()`/`APIError()` no longer emit dangling `". Tags:"`/`". Fields:"` for empty sets/maps.
+- Instance factory methods honor ignore options without a nil type-assertion panic.
+- Resolved the open Dependabot security advisories by upgrading dependencies.
+
 ## [1.1.1] - 2023-03-29
 ### Added
 - Added `NewNotFoundError`.

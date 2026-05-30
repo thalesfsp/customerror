@@ -10,6 +10,7 @@ import (
 // Consts, vars, and types.
 //////
 
+// Built-in language codes (ISO 639-1) supported out of the box.
 const (
 	Chinese    Language = "zh"
 	English    Language = "en"

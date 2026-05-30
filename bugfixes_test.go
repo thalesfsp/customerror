@@ -449,13 +449,13 @@ func TestFix_ConcurrentNewIsRaceFree(t *testing.T) {
 
 	results := make(chan error, n)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		go func(i int) {
 			results <- New(fmt.Sprintf("message %d", i), WithErrorCode("E1010"), WithStatusCode(http.StatusBadRequest))
 		}(i)
 	}
 
-	for i := 0; i < n; i++ {
+	for range n {
 		assert.NotNil(t, <-results)
 	}
 }

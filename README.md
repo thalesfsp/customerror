@@ -4,7 +4,13 @@
 
 ## Install
 
-`$ go get github.com/thalesfsp/customerror@vX.Y.Z`
+`$ go get github.com/thalesfsp/customerror/v2@latest`
+
+Import it (the package name remains `customerror`):
+
+```go
+import "github.com/thalesfsp/customerror/v2"
+```
 
 ## Usage
 
@@ -12,7 +18,7 @@ See [`example_test.go`](example_test.go), and [`customerror_test.go`](customerro
 
 ## Documentation
 
-Run `$ make doc` or check out [online](https://pkg.go.dev/github.com/thalesfsp/customerror).
+Run `$ make doc` or check out [online](https://pkg.go.dev/github.com/thalesfsp/customerror/v2).
 
 ## Development
 

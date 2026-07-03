@@ -26,13 +26,12 @@ import (
 // catalog at startup, and returns them - enriched per-request - as JSON over
 // HTTP.
 func TestE2E_HTTPAPIErrorFlow(t *testing.T) {
-	// Application startup: build the error catalog. NOTE: the code is only the
-	// catalog KEY; set it on the error itself via WithErrorCode when it should
-	// travel with the error (message prefix, JSON, IsErrorCode).
+	// Application startup: build the error catalog. NOTE: since v2.2.0 Set
+	// also stamps the code on the entry itself, so it travels with the error
+	// (message prefix, JSON, IsErrorCode) without an explicit WithErrorCode.
 	catalog := MustNewCatalog("userservice")
 	catalog.
 		MustSet("USER_NOT_FOUND", "user",
-			WithErrorCode("USER_NOT_FOUND"),
 			WithStatusCode(http.StatusNotFound),
 			WithTag("user", "lookup"),
 		).

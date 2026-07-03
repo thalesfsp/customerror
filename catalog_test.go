@@ -68,7 +68,9 @@ func TestNewCatalog(t *testing.T) {
 			// error.
 			cEInvalidRequestBody := cEInvalidRequestBodyErr.New(WithLanguage("pt-BR"), WithError(errors.New("some error")))
 
-			if cEInvalidRequestBody.Error() != "corpo da solicitação inválido. Original Error: some error" {
+			// Since v2.2.0 catalog entries carry their code, so Error() gains
+			// the "CODE: " prefix.
+			if cEInvalidRequestBody.Error() != "INVALID_REQUEST_BODY: corpo da solicitação inválido. Original Error: some error" {
 				t.Errorf("NewCatalog() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
@@ -83,8 +85,8 @@ func TestNewCatalog(t *testing.T) {
 
 			cEE1010 := cEE1010Err.New(WithLanguage("es-ES"))
 
-			if cEE1010.Error() != "resposta inválida" {
-				t.Errorf("NewCatalog() error = %v, wantErr %v", err, "resposta inválida")
+			if cEE1010.Error() != "E1010: resposta inválida" {
+				t.Errorf("NewCatalog() error = %v, wantErr %v", err, "E1010: resposta inválida")
 
 				return
 			}

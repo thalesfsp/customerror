@@ -140,14 +140,20 @@ func Copy(src, target *CustomError) *CustomError {
 	}
 
 	// Merge the tags.
-	if src.Tags != nil {
+	//
+	// NOTE: When src and target share the very same Set (same pointer) there
+	// is nothing to merge - and it must be skipped so the target's write lock
+	// is never requested while iterating the (same) source.
+	if src.Tags != nil && src.Tags != target.Tags {
 		if target.Tags == nil {
-			target.Tags = &Set{treeset.NewWithStringComparator()}
+			target.Tags = newSet()
 		}
 
-		src.Tags.Each(func(_ int, value interface{}) {
+		// Snapshot the source values first so no lock is held on the source
+		// while the target is being mutated.
+		for _, value := range src.Tags.Values() {
 			target.Tags.Add(value)
-		})
+		}
 	}
 
 	return target
@@ -208,21 +214,117 @@ func addUserFieldsToJSON(temp map[string]interface{}, fields *sync.Map) {
 // Set is a wrapper around the treeset.Set, providing a collection
 // that stores unique elements in a sorted order. It is used in the
 // CustomError struct to maintain a sorted set of tags.
+//
+// The methods defined on Set itself - `Add`, `Remove`, `Contains`, `Empty`,
+// `Size`, `Clear`, `Values`, `Each`, `String`, and `MarshalJSON` - are safe
+// for concurrent use by multiple goroutines. Calling any other method of the
+// embedded treeset.Set directly (e.g. `Iterator`, `UnmarshalJSON`) bypasses
+// the lock and is NOT safe for concurrent use.
 type Set struct {
 	*treeset.Set
+
+	// mu guards the embedded treeset.Set.
+	mu sync.RWMutex
+}
+
+// newSet creates a new Set, optionally initialized with the given values.
+func newSet(values ...interface{}) *Set {
+	return &Set{Set: treeset.NewWithStringComparator(values...)}
+}
+
+// Add adds the given items to the set. Safe for concurrent use.
+func (s *Set) Add(items ...interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.Set.Add(items...)
+}
+
+// Remove removes the given items from the set. Safe for concurrent use.
+func (s *Set) Remove(items ...interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.Set.Remove(items...)
+}
+
+// Contains checks whether the set contains all the given items. Safe for
+// concurrent use.
+func (s *Set) Contains(items ...interface{}) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.Set.Contains(items...)
+}
+
+// Empty checks whether the set has no elements. Safe for concurrent use.
+func (s *Set) Empty() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.Set.Empty()
+}
+
+// Size returns the number of elements in the set. Safe for concurrent use.
+func (s *Set) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.Set.Size()
+}
+
+// Clear removes all elements from the set. Safe for concurrent use.
+func (s *Set) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.Set.Clear()
+}
+
+// Values returns all elements in the set, sorted. Safe for concurrent use.
+func (s *Set) Values() []interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.Set.Values()
+}
+
+// Each calls the given function once for each element, in sorted order. Safe
+// for concurrent use.
+//
+// NOTE: `f` must NOT call methods of the same Set (the lock is held for the
+// whole iteration); snapshot with `Values` first if that is needed.
+func (s *Set) Each(f func(index int, value interface{})) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	s.Set.Each(f)
 }
 
 // String implements the Stringer interface for the Set type.
 // It returns a comma-separated string representation of all elements
-// in the set, useful for debugging and error message formatting.
+// in the set, useful for debugging and error message formatting. Safe for
+// concurrent use.
 func (s *Set) String() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	items := []string{}
 
-	s.Each(func(_ int, value interface{}) {
+	s.Set.Each(func(_ int, value interface{}) {
 		items = append(items, fmt.Sprintf("%v", value))
 	})
 
 	return strings.Join(items, ", ")
+}
+
+// MarshalJSON implements the json.Marshaler interface, delegating to the
+// embedded treeset.Set implementation. Safe for concurrent use.
+func (s *Set) MarshalJSON() ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.Set.MarshalJSON()
 }
 
 // CustomError is the base block to create custom errors. It provides context -
@@ -807,7 +909,8 @@ func New(message string, opts ...Option) error {
 		return nil
 	}
 
-	if err := validate.Struct(cE); err != nil {
+	err := validate.Struct(cE)
+	if err != nil {
 		log.Panicf("Invalid custom error. %s\n", err)
 	}
 

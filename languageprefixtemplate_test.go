@@ -60,13 +60,14 @@ func TestSetErrorTypePrefixTemplateMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AddNewLanguage("bl-BA", NewErrorPrefixMap(
+			err := AddNewLanguage("bl-BA", NewErrorPrefixMap(
 				"blablabla %s",
 				"blebleble %s",
 				"bliblibli %s",
 				"blobloblo %s",
 				"blublublu %s",
-			)); (err != nil) != tt.wantErr {
+			))
+			if (err != nil) != tt.wantErr {
 				t.Errorf("SetErrorTypePrefixTemplateMap() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

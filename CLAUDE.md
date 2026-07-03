@@ -47,6 +47,10 @@ the `/v2` suffix; the package name is still `customerror`).
   code `gte=2`, status `100..511`. They must NEVER call `os.Exit`/`log.Fatalf`.
 - `From(*CustomError, …)` returns a modified COPY (never mutates the original);
   so `errors.Is(From(x,…), x)` is false for a `*CustomError` input.
+- Since v2.2.0 `Catalog.Set` stamps the code on the stored entry, so
+  catalog-derived errors print with the `CODE: ` prefix (an explicit
+  `WithErrorCode` wins). `Set` (Tags) construction goes through the unexported
+  `newSet()` - positional `&Set{…}` literals no longer compile (mutex field).
 
 ## Build / test / lint
 - `make test` / `make coverage` — `go test -race -cover` (passes; ~93%).
@@ -54,10 +58,10 @@ the `/v2` suffix; the package name is still `customerror`).
   CI pins **golangci-lint v2.5.0** + **Go 1.25** (`.github/workflows/go.yml`,
   `golangci/golangci-lint-action@v8`). A modern (v2.x) golangci-lint runs the
   config directly — no version gymnastics needed.
-  - The v2 migration disabled three linters that are new in v2 and clash with
-    the repo's idioms, to preserve the prior baseline: `noinlineerr`,
-    `funcorder`, `wsl_v5` (the old `wsl` stays). Re-enable deliberately if you
-    want to adopt them (each needs codebase-wide changes).
+  - Since v2.2.0 the config adopts `noinlineerr` (no
+    `if err := f(); err != nil` - use plain assignment + check), `funcorder`
+    (constructors/Factory sections precede Methods sections), and `wsl_v5`
+    (replaces the deprecated `wsl`; same `_test.go` relaxation as before).
   - `default: all` is strict: `intrange`/`copyloopvar` are on (use
     `for i := range n`); non-Latin template strings need a `gosmopolitan`
     exception (test files are already excluded) or `//nolint:gosmopolitan`.

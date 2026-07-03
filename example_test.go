@@ -46,7 +46,8 @@ func ExampleNew() {
 	}
 
 	// Case: Without `id`, returns `ErrMissingID`.
-	if err := SomeFunc(""); err != nil {
+	err := SomeFunc("")
+	if err != nil {
 		fmt.Println(errors.Is(err, ErrMissingID)) // true
 
 		var cE *CustomError
@@ -58,13 +59,14 @@ func ExampleNew() {
 	}
 
 	// Case: With `id`, returns dynamic error.
-	if err := SomeFunc("12345"); err != nil {
+	errDynamic := SomeFunc("12345")
+	if errDynamic != nil {
 		var cE *CustomError
-		if errors.As(err, &cE) {
+		if errors.As(errDynamic, &cE) {
 			fmt.Println(cE.StatusCode) // 500
 		}
 
-		fmt.Println(err) // E1523: failed to write to disk (500 - Internal Server Error)
+		fmt.Println(errDynamic) // E1523: failed to write to disk (500 - Internal Server Error)
 	}
 
 	// output:
@@ -108,7 +110,8 @@ func ExampleNew_marshalJSON() {
 	errA := NewMissingError("id")
 	errB := NewMissingError("name", WithError(errA))
 
-	if err := json.NewEncoder(&buf).Encode(errB); err != nil {
+	err := json.NewEncoder(&buf).Encode(errB)
+	if err != nil {
 		panic(err)
 	}
 
@@ -410,9 +413,9 @@ func ExampleNew_i18n() {
 	fmt.Println(err.NewInvalidError())
 
 	// output:
-	// ruta de disco duro inválido
-	// chemin de disque dur invalide
-	// invalid hard drive path
+	// ERR_INVALID_HARD_DRIVE_PATH: ruta de disco duro inválido
+	// ERR_INVALID_HARD_DRIVE_PATH: chemin de disque dur invalide
+	// ERR_INVALID_HARD_DRIVE_PATH: invalid hard drive path
 }
 
 // ExampleNew_i18n demonstrates how to create an error catalog with translations
@@ -519,10 +522,10 @@ func ExampleNew_i18nSetupNewLang() {
 	fmt.Println(err.NewInvalidError())
 
 	// output:
-	// ruta de disco duro inválido
-	// chemin de disque dur invalide
-	// ハードドライブのパス が無効です
-	// invalid hard drive path
+	// ERR_INVALID_HARD_DRIVE_PATH: ruta de disco duro inválido
+	// ERR_INVALID_HARD_DRIVE_PATH: chemin de disque dur invalide
+	// ERR_INVALID_HARD_DRIVE_PATH: ハードドライブのパス が無効です
+	// ERR_INVALID_HARD_DRIVE_PATH: invalid hard drive path
 }
 
 type CustomClassifier struct{}
@@ -573,10 +576,11 @@ func ExampleNew_newRetryableError() {
 	)
 
 	// Execute the request with retry logic.
-	if err := r1.Run(func() error {
+	err := r1.Run(func() error {
 		// Throw the retryable error.
 		return retryableCE
-	}); err != nil {
+	})
+	if err != nil {
 		fmt.Println(err)
 	}
 

@@ -16,8 +16,6 @@ package customerror
 import (
 	"strings"
 	"sync"
-
-	"github.com/emirpasic/gods/sets/treeset"
 )
 
 //////
@@ -114,7 +112,7 @@ func WithIgnoreString(s ...string) Option {
 func WithTag(tag ...string) Option {
 	return func(cE *CustomError) {
 		if cE.Tags == nil {
-			cE.Tags = &Set{treeset.NewWithStringComparator()}
+			cE.Tags = newSet()
 		}
 
 		for _, t := range tag {

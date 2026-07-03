@@ -59,6 +59,22 @@ type (
 )
 
 //////
+// Factory.
+//////
+
+// NewLanguage creates a new Lang.
+func NewLanguage(lang string) (Language, error) {
+	l := Language(lang)
+
+	err := l.Validate()
+	if err != nil {
+		return "", err
+	}
+
+	return l, nil
+}
+
+//////
 // Methods.
 //////
 
@@ -85,19 +101,4 @@ func (l Language) GetRoot() string {
 	}
 
 	return ""
-}
-
-//////
-// Factory.
-//////
-
-// NewLanguage creates a new Lang.
-func NewLanguage(lang string) (Language, error) {
-	l := Language(lang)
-
-	if err := l.Validate(); err != nil {
-		return "", err
-	}
-
-	return l, nil
 }

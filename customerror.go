@@ -909,7 +909,8 @@ func New(message string, opts ...Option) error {
 		return nil
 	}
 
-	if err := validate.Struct(cE); err != nil {
+	err := validate.Struct(cE)
+	if err != nil {
 		log.Panicf("Invalid custom error. %s\n", err)
 	}
 

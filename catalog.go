@@ -60,6 +60,48 @@ type (
 )
 
 //////
+// Factory.
+//////
+
+// NewErrorCode creates a new ErrorCode. It will be validated and stored upper
+// cased.
+func NewErrorCode(name string) (ErrorCode, error) {
+	eC := ErrorCode(strings.ToUpper(name))
+
+	err := eC.Validate()
+	if err != nil {
+		return "", err
+	}
+
+	return eC, nil
+}
+
+// NewCatalog creates a new Catalog.
+func NewCatalog(name string) (*Catalog, error) {
+	c := &Catalog{
+		ErrorCodeErrorMap: &sync.Map{},
+		Name:              name,
+	}
+
+	err := validate.Struct(c)
+	if err != nil {
+		return nil, ErrCatalogInvalidName
+	}
+
+	return c, nil
+}
+
+// MustNewCatalog creates a new Catalog. If an error occurs, panics.
+func MustNewCatalog(name string) *Catalog {
+	c, err := NewCatalog(name)
+	if err != nil {
+		panic(err)
+	}
+
+	return c
+}
+
+//////
 // Methods.
 //////
 
@@ -111,7 +153,8 @@ func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) (
 // MustSet a custom error to the catalog. Use options to set default and common
 // values such as fields, tags, etc. If an error occurs, panics.
 func (c *Catalog) MustSet(errorCode string, defaultMessage string, opts ...Option) *Catalog {
-	if _, err := c.Set(errorCode, defaultMessage, opts...); err != nil {
+	_, err := c.Set(errorCode, defaultMessage, opts...)
+	if err != nil {
 		panic(err)
 	}
 
@@ -202,44 +245,4 @@ func (c *Catalog) MarshalJSON() ([]byte, error) {
 		Name:         c.Name,
 		CustomErrors: entries,
 	})
-}
-
-//////
-// Factory.
-//////
-
-// NewErrorCode creates a new ErrorCode. It will be validated and stored upper
-// cased.
-func NewErrorCode(name string) (ErrorCode, error) {
-	eC := ErrorCode(strings.ToUpper(name))
-
-	if err := eC.Validate(); err != nil {
-		return "", err
-	}
-
-	return eC, nil
-}
-
-// NewCatalog creates a new Catalog.
-func NewCatalog(name string) (*Catalog, error) {
-	c := &Catalog{
-		ErrorCodeErrorMap: &sync.Map{},
-		Name:              name,
-	}
-
-	if err := validate.Struct(c); err != nil {
-		return nil, ErrCatalogInvalidName
-	}
-
-	return c, nil
-}
-
-// MustNewCatalog creates a new Catalog. If an error occurs, panics.
-func MustNewCatalog(name string) *Catalog {
-	c, err := NewCatalog(name)
-	if err != nil {
-		panic(err)
-	}
-
-	return c
 }

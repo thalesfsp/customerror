@@ -233,7 +233,8 @@ func MustAddNewLanguage(
 	language string,
 	errorTypePrefixTemplateMap ErrorPrefixMap,
 ) {
-	if err := AddNewLanguage(language, errorTypePrefixTemplateMap); err != nil {
+	err := AddNewLanguage(language, errorTypePrefixTemplateMap)
+	if err != nil {
 		panic(err)
 	}
 }

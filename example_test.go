@@ -410,9 +410,9 @@ func ExampleNew_i18n() {
 	fmt.Println(err.NewInvalidError())
 
 	// output:
-	// ruta de disco duro inválido
-	// chemin de disque dur invalide
-	// invalid hard drive path
+	// ERR_INVALID_HARD_DRIVE_PATH: ruta de disco duro inválido
+	// ERR_INVALID_HARD_DRIVE_PATH: chemin de disque dur invalide
+	// ERR_INVALID_HARD_DRIVE_PATH: invalid hard drive path
 }
 
 // ExampleNew_i18n demonstrates how to create an error catalog with translations
@@ -519,10 +519,10 @@ func ExampleNew_i18nSetupNewLang() {
 	fmt.Println(err.NewInvalidError())
 
 	// output:
-	// ruta de disco duro inválido
-	// chemin de disque dur invalide
-	// ハードドライブのパス が無効です
-	// invalid hard drive path
+	// ERR_INVALID_HARD_DRIVE_PATH: ruta de disco duro inválido
+	// ERR_INVALID_HARD_DRIVE_PATH: chemin de disque dur invalide
+	// ERR_INVALID_HARD_DRIVE_PATH: ハードドライブのパス が無効です
+	// ERR_INVALID_HARD_DRIVE_PATH: invalid hard drive path
 }
 
 type CustomClassifier struct{}

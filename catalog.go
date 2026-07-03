@@ -1,6 +1,7 @@
 package customerror
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -47,6 +48,10 @@ type (
 	// Catalog contains a set of errors (customerrors).
 	Catalog struct {
 		// CustomErrors are the errors in the catalog.
+		//
+		// NOTE: The `json` tag only documents the shape - `encoding/json`
+		// cannot marshal a `*sync.Map`, so `MarshalJSON` is the source of
+		// truth for the catalog's JSON representation.
 		ErrorCodeErrorMap ErrorCodeErrorMap `json:"custom_errors"`
 
 		// Name of the catalog, usually, the name of the application.
@@ -76,6 +81,12 @@ func (e ErrorCode) Validate() error {
 // values such as fields, tags, etc. If the resulting error is nil (an ignore
 // option was triggered), nothing is stored and `ErrCatalogNilEntry` is
 // returned - a nil entry would otherwise panic on `Get`.
+//
+// The validated, uppercased code is also set on the stored entry itself
+// (`Code`), so errors retrieved from the catalog are identifiable by default:
+// `Error()` gains the "CODE: " prefix, the JSON output carries `code`, and
+// `IsErrorCode` matches. An explicit, non-empty code provided via
+// `WithErrorCode` wins - it is never overwritten.
 func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) (string, error) {
 	eC, err := NewErrorCode(errorCode)
 	if err != nil {
@@ -85,6 +96,11 @@ func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) (
 	cE := Factory(defaultMessage, opts...)
 	if cE == nil {
 		return "", ErrCatalogNilEntry
+	}
+
+	// Carry the code on the entry itself unless the caller explicitly set one.
+	if cE.Code == "" {
+		cE.Code = eC.String()
 	}
 
 	c.ErrorCodeErrorMap.Store(eC, cE)
@@ -144,6 +160,48 @@ func (c *Catalog) MustGet(errorCode string, opts ...Option) *CustomError {
 	}
 
 	return customErr
+}
+
+//////
+// Implementing the json.Marshaler interface.
+//////
+
+// MarshalJSON implements the json.Marshaler interface. It is the source of
+// truth for the catalog's JSON shape:
+//
+//	{"name": "<name>", "custom_errors": {"<CODE>": <entry>, ...}}
+//
+// `encoding/json` cannot marshal the underlying `*sync.Map`, so the entries
+// are snapshotted into a plain map - keyed by the error code - and each entry
+// is marshaled via its own `MarshalJSON`. `encoding/json` sorts map keys, so
+// the output is deterministic. Nil (or foreign) entries stored directly into
+// the map, bypassing `Set`, are defensively skipped.
+func (c *Catalog) MarshalJSON() ([]byte, error) {
+	entries := map[string]*CustomError{}
+
+	c.ErrorCodeErrorMap.Range(func(key, value interface{}) bool {
+		eC, ok := key.(ErrorCode)
+		if !ok {
+			return true
+		}
+
+		cE, ok := value.(*CustomError)
+		if !ok || cE == nil {
+			return true
+		}
+
+		entries[eC.String()] = cE
+
+		return true
+	})
+
+	return json.Marshal(struct {
+		Name         string                  `json:"name"`
+		CustomErrors map[string]*CustomError `json:"custom_errors"`
+	}{
+		Name:         c.Name,
+		CustomErrors: entries,
+	})
 }
 
 //////

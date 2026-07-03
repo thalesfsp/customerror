@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-07-03
+### Added
+- `Catalog` now implements `json.Marshaler`: `json.Marshal(catalog)` produces
+  `{"name": ..., "custom_errors": {"<CODE>": <entry>, ...}}` with deterministic
+  (sorted) keys, instead of an empty object (the underlying `*sync.Map` is not
+  JSON-marshalable); nil or foreign entries stored directly into the map are
+  skipped defensively.
+- The `Set` type (the `Tags` container) is now safe for concurrent use:
+  `Add`, `Remove`, `Contains`, `Empty`, `Size`, `Clear`, `Values`, `Each`,
+  `String`, and `MarshalJSON` are guarded by an internal `RWMutex`. Calling
+  other embedded treeset methods directly bypasses the lock (documented).
+
+### Changed
+- **Behavior change**: `Catalog.Set` now stamps the validated, uppercased
+  error code on the stored entry itself (`Code`), so errors retrieved from a
+  catalog carry their code by default - `Error()` gains the `CODE: ` prefix,
+  JSON output includes `code`, and `IsErrorCode` matches. An explicit
+  `WithErrorCode` still wins.
+- `Copy` no longer deadlocks when `src` and `target` share the same `Tags`
+  set, and merges tags via a snapshot so no lock is held across two sets.
+- Lint: adopted `noinlineerr`, `funcorder`, and `wsl_v5` (replacing the
+  deprecated `wsl`); constructors now precede methods and inline
+  `if err := ...; err != nil` was split codebase-wide. No behavior changes.
+
 ## [2.1.0] - 2026-07-03
 ### Changed
 - `IsCustomError`, `To`, `IsHTTPStatus`, `IsErrorCode`, and `IsRetryable` now

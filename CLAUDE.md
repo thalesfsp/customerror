@@ -37,8 +37,8 @@ the `/v2` suffix; the package name is still `customerror`).
   precedence — it is load-bearing.
 
 ## Gotchas
-- `Error()` output is non-deterministic for >1 field (`sync.Map` range order);
-  assert with `strings.Contains`, not equality.
+- `Error()` field output is deterministic since v2.1.0: fields are sorted by
+  key (`. Fields: a=1, b=2`); tags are sorted too (treeset).
 - `example_test.go` asserts EXACT stdout — any message-format change breaks it.
 - The template singleton (`languageprefixtemplate.go`) is package-global and
   persists across tests. In tests, register/use UNIQUE language codes (e.g.

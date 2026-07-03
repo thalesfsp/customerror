@@ -19,6 +19,11 @@ var (
 	// ErrCatalogInvalidName is returned when a catalog name is invalid.
 	ErrCatalogInvalidName = NewInvalidError("name", WithErrorCode("CE_ERR_CATALOG_INVALID_NAME"))
 
+	// ErrCatalogNilEntry is returned when the error being set resolves to nil
+	// - for example, when an ignore option (`WithIgnoreFunc`/`WithIgnoreString`)
+	// was triggered - and therefore cannot be stored in the catalog.
+	ErrCatalogNilEntry = NewInvalidError("entry. It resolves to nil (an ignore option was triggered?) and cannot be stored in the catalog", WithErrorCode("CE_ERR_CATALOG_NIL_ENTRY"))
+
 	// ErrErrorCodeInvalidCode is returned when an error code is invalid.
 	ErrErrorCodeInvalidCode = NewInvalidError("error code. It requires typeOf, and subject", WithErrorCode("CE_ERR_INVALID_ERROR_CODE"))
 
@@ -68,14 +73,21 @@ func (e ErrorCode) Validate() error {
 }
 
 // Set a custom error to the catalog. Use options to set default and common
-// values such as fields, tags, etc.
+// values such as fields, tags, etc. If the resulting error is nil (an ignore
+// option was triggered), nothing is stored and `ErrCatalogNilEntry` is
+// returned - a nil entry would otherwise panic on `Get`.
 func (c *Catalog) Set(errorCode string, defaultMessage string, opts ...Option) (string, error) {
 	eC, err := NewErrorCode(errorCode)
 	if err != nil {
 		return "", err
 	}
 
-	c.ErrorCodeErrorMap.Store(eC, Factory(defaultMessage, opts...))
+	cE := Factory(defaultMessage, opts...)
+	if cE == nil {
+		return "", ErrCatalogNilEntry
+	}
+
+	c.ErrorCodeErrorMap.Store(eC, cE)
 
 	return eC.String(), nil
 }
@@ -106,8 +118,15 @@ func (c *Catalog) Get(errorCode string, opts ...Option) (*CustomError, error) {
 		return nil, fmt.Errorf("%w. Code: %s", ErrCatalogErrorNotFound, errCode)
 	}
 
+	// Defensive: a non-CustomError or nil entry (e.g. stored directly into the
+	// map, bypassing `Set`) is treated as not found instead of panicking.
+	storedCE, ok := customErr.(*CustomError)
+	if !ok || storedCE == nil {
+		return nil, fmt.Errorf("%w. Code: %s", ErrCatalogErrorNotFound, errCode)
+	}
+
 	// Return a copy so the caller cannot mutate the catalog's stored entry.
-	cE := Copy(customErr.(*CustomError), &CustomError{})
+	cE := Copy(storedCE, &CustomError{})
 
 	// Apply the caller-provided options to the copy.
 	for _, opt := range opts {

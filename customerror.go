@@ -6,10 +6,12 @@ package customerror
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 
@@ -47,7 +49,18 @@ var reservedJSONKeys = map[string]struct{}{
 // are properly copied. This function is useful when you need to create a new
 // CustomError instance based on an existing one, while avoiding any shared
 // references to mutable fields.
+//
+// A nil `src` is a no-op (target is returned unchanged); a nil `target` is
+// replaced by a fresh CustomError so the call never panics.
 func Copy(src, target *CustomError) *CustomError {
+	if target == nil {
+		target = &CustomError{}
+	}
+
+	if src == nil {
+		return target
+	}
+
 	if src.Code != "" {
 		target.Code = src.Code
 	}
@@ -141,7 +154,8 @@ func Copy(src, target *CustomError) *CustomError {
 }
 
 // Process fields and add them to the error message. If `fields` is nil or
-// empty, the message is returned unchanged (no dangling ". Fields:").
+// empty, the message is returned unchanged (no dangling ". Fields:"). Fields
+// are sorted by key so the output is deterministic.
 func processFields(
 	errMsg string,
 	fields *sync.Map,
@@ -150,19 +164,21 @@ func processFields(
 		return errMsg
 	}
 
-	var b strings.Builder
+	pairs := []string{}
 
 	fields.Range(func(k, v interface{}) bool {
-		fmt.Fprintf(&b, " %v=%v,", k, v)
+		pairs = append(pairs, fmt.Sprintf("%v=%v", k, v))
 
 		return true
 	})
 
-	if b.Len() == 0 {
+	if len(pairs) == 0 {
 		return errMsg
 	}
 
-	return fmt.Sprintf("%s. Fields:%s", errMsg, strings.TrimSuffix(b.String(), ","))
+	sort.Strings(pairs)
+
+	return fmt.Sprintf("%s. Fields: %s", errMsg, strings.Join(pairs, ", "))
 }
 
 // addUserFieldsToJSON copies user-provided fields into the JSON map `temp`,
@@ -699,7 +715,10 @@ func (w *wrappedError) Unwrap() []error {
 // Wrap wraps `customError` together with the additional `errors`. The returned
 // error preserves the identity of every wrapped error, so errors.Is and
 // errors.As match against `customError` and each of `errors`. Nil errors are
-// ignored.
+// ignored: if `customError` is nil the first non-nil additional error takes
+// its place, if every error is nil, nil is returned, and if there is nothing
+// to wrap the single remaining error is returned as-is (no dangling
+// "Wrapped Error(s)" suffix).
 func Wrap(customError error, errors ...error) error {
 	nonNil := make([]error, 0, len(errors))
 
@@ -707,6 +726,18 @@ func Wrap(customError error, errors ...error) error {
 		if err != nil {
 			nonNil = append(nonNil, err)
 		}
+	}
+
+	if customError == nil {
+		if len(nonNil) == 0 {
+			return nil
+		}
+
+		customError, nonNil = nonNil[0], nonNil[1:]
+	}
+
+	if len(nonNil) == 0 {
+		return customError
 	}
 
 	return &wrappedError{
@@ -801,18 +832,21 @@ func Factory(message string, opts ...Option) *CustomError {
 	return cE
 }
 
-// IsCustomError checks if the error is a `CustomError`.
+// IsCustomError checks if the error is - or wraps - a `CustomError`
+// (it traverses the error chain, see errors.As).
 func IsCustomError(err error) bool {
-	_, ok := err.(*CustomError)
+	var cE *CustomError
 
-	return ok
+	return errors.As(err, &cE)
 }
 
-// To converts the error to a `CustomError`.
+// To converts the error to a `CustomError`. It traverses the error chain
+// (see errors.As), so a `CustomError` wrapped by fmt.Errorf ("%w") or `Wrap`
+// is found too; the first `CustomError` in the chain is returned.
 func To(err error) (*CustomError, bool) {
-	cE, ok := err.(*CustomError)
+	var cE *CustomError
 
-	if !ok {
+	if !errors.As(err, &cE) {
 		return nil, false
 	}
 
@@ -824,8 +858,14 @@ func To(err error) (*CustomError, bool) {
 // copy is returned - this makes it safe to use with shared sentinel errors. If
 // `err` isn't a custom error, a new custom error wrapping it (with the given
 // options) is returned.
+//
+// NOTE: Unlike `To`, `From` intentionally only treats a DIRECT `*CustomError`
+// specially - a custom error nested inside another error is wrapped like any
+// other error, so no outer context is ever dropped.
+//
+//nolint:errorlint
 func From(err error, opts ...Option) error {
-	if cE, ok := To(err); ok {
+	if cE, ok := err.(*CustomError); ok {
 		// Operate on a copy so the original error (which may be a shared
 		// sentinel) is never mutated.
 		finalCE := Copy(cE, &CustomError{})
@@ -843,10 +883,11 @@ func From(err error, opts ...Option) error {
 	return New(err.Error(), opts...)
 }
 
-// IsHTTPStatus checks if the error is a `CustomError` with the
-// specified HTTP status code.
+// IsHTTPStatus checks if the error is - or wraps - a `CustomError` with the
+// specified HTTP status code (the first `CustomError` in the chain is
+// checked, see errors.As).
 func IsHTTPStatus(err error, statusCode int) bool {
-	cE, ok := err.(*CustomError)
+	cE, ok := To(err)
 
 	if !ok {
 		return false
@@ -855,10 +896,11 @@ func IsHTTPStatus(err error, statusCode int) bool {
 	return cE.StatusCode == statusCode
 }
 
-// IsErrorCode checks if the error is a `CustomError` with the
-// specified code.
+// IsErrorCode checks if the error is - or wraps - a `CustomError` with the
+// specified code (the first `CustomError` in the chain is checked, see
+// errors.As).
 func IsErrorCode(err error, code string) bool {
-	cE, ok := err.(*CustomError)
+	cE, ok := To(err)
 
 	if !ok {
 		return false
@@ -867,9 +909,10 @@ func IsErrorCode(err error, code string) bool {
 	return cE.Code == code
 }
 
-// IsRetryable checks if the error is a retryable `CustomError`.
+// IsRetryable checks if the error is - or wraps - a retryable `CustomError`
+// (the first `CustomError` in the chain is checked, see errors.As).
 func IsRetryable(err error) bool {
-	cE, ok := err.(*CustomError)
+	cE, ok := To(err)
 
 	if !ok {
 		return false

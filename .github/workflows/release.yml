@@ -1,0 +1,53 @@
+# Copyright 2021 The customerror Authors. All rights reserved.
+# Use of this source code is governed by a MIT
+# license that can be found in the LICENSE file.
+
+---
+
+name: Release
+
+# Manually dispatched: creates the git tag (at the given target commit or
+# branch) and the GitHub release in one step.
+#
+# Usage: Actions -> Release -> Run workflow, set `tag` (e.g. v2.1.0) and
+# optionally `target` (default: main) and `notes`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create (e.g. v2.1.0)"
+        required: true
+        type: string
+      target:
+        description: "Commitish to tag (branch or SHA)"
+        required: false
+        default: "main"
+        type: string
+      notes:
+        description: "Release notes (optional; auto-generated when empty)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ inputs.target }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          if [ -n "$NOTES" ]; then
+            gh release create "$TAG" --target "$TARGET" --title "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" --target "$TARGET" --title "$TAG" --generate-notes
+          fi

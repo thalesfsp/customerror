@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-07-03
+### Changed
+- `IsCustomError`, `To`, `IsHTTPStatus`, `IsErrorCode`, and `IsRetryable` now
+  traverse the error chain (`errors.As`), so a `CustomError` wrapped via
+  `fmt.Errorf("%w")` or `Wrap` is found too. `From` intentionally keeps its
+  previous semantics (only a direct `*CustomError` is treated specially).
+- `Error()`/`APIError()` field output is now deterministic: fields are sorted
+  by key (previously the order was random for more than one field).
+
+### Fixed
+- `Catalog.Set` no longer stores a nil entry when an ignore option
+  (`WithIgnoreFunc`/`WithIgnoreString`) fires; it returns the new
+  `ErrCatalogNilEntry` error instead (previously a later `Catalog.Get`/`MustGet`
+  on that code panicked with a nil-pointer dereference).
+- `Catalog.Get` no longer panics on a nil or non-`CustomError` entry stored
+  directly into the map; it returns `ErrCatalogErrorNotFound`.
+- `Wrap` no longer panics when `customError` is nil: the first non-nil
+  additional error takes its place, and if every error is nil, `Wrap` returns
+  nil. With nothing to wrap, the single error is returned as-is instead of
+  emitting a dangling `". Wrapped Error(s): "` suffix.
+- `Copy` is now nil-safe: a nil `src` is a no-op and a nil `target` is
+  replaced with a fresh `CustomError` (previously both panicked).
+
 ## [2.0.0] - 2026-05-30
 ### Changed
 - **BREAKING:** module path is now `github.com/thalesfsp/customerror/v2`.

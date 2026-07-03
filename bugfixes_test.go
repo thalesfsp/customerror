@@ -662,3 +662,205 @@ func TestFix_Sanity_SetStringDeterministic(t *testing.T) {
 	e := New("msg", WithTag("b", "a", "c")).(*CustomError)
 	assert.Equal(t, "a, b, c", strings.TrimSpace(e.Tags.String()))
 }
+
+//////
+// #22 - Catalog.Set must not store a nil entry when an ignore option fires;
+// Catalog.Get must never panic on a nil/foreign entry.
+//////
+
+func TestFix_CatalogSet_NilEntryRejected(t *testing.T) {
+	c := MustNewCatalog("myapp")
+
+	// Bad path (pre-fix: stored nil, then Get panicked): an ignore option that
+	// fires makes Factory return nil; Set must reject it with an error.
+	code, err := c.Set("IGNORED_CODE", "some message", WithIgnoreString("some"))
+	require.Error(t, err)
+	assert.Empty(t, code)
+	assert.True(t, IsErrorCode(err, "CE_ERR_CATALOG_NIL_ENTRY"))
+
+	// Nothing was stored.
+	_, err = c.Get("IGNORED_CODE")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrCatalogErrorNotFound)
+
+	// Edge: a nil entry stored directly into the map (bypassing Set) must not
+	// panic Get either.
+	c.ErrorCodeErrorMap.Store(ErrorCode("POISONED"), (*CustomError)(nil))
+
+	got, err := c.Get("POISONED")
+	require.Error(t, err)
+	assert.Nil(t, got)
+	assert.ErrorIs(t, err, ErrCatalogErrorNotFound)
+
+	// Happy path is unaffected.
+	code, err = c.Set("OK_CODE", "some message")
+	require.NoError(t, err)
+	assert.Equal(t, "OK_CODE", code)
+
+	entry, err := c.Get("OK_CODE")
+	require.NoError(t, err)
+	assert.Equal(t, "some message", entry.Message)
+}
+
+//////
+// #23 - Wrap must tolerate nil inputs, and must not emit a dangling
+// "Wrapped Error(s):" suffix when there is nothing to wrap.
+//////
+
+func TestFix_Wrap_NilSafety(t *testing.T) {
+	primary := New("primary", WithErrorCode("E1010"))
+	extra := errors.New("extra")
+
+	// Bad path (pre-fix: Error() nil-panicked): nil customError.
+	assert.NoError(t, Wrap(nil))
+	assert.NoError(t, Wrap(nil, nil, nil))
+
+	// Nil customError: the first non-nil error takes its place.
+	promoted := Wrap(nil, primary, extra)
+	require.Error(t, promoted)
+	assert.Equal(t, "E1010: primary. Wrapped Error(s): extra", promoted.Error())
+	assert.ErrorIs(t, promoted, primary)
+	assert.ErrorIs(t, promoted, extra)
+
+	// Edge: nothing to wrap - the error is returned as-is, so there is no
+	// dangling ". Wrapped Error(s): " suffix.
+	only := Wrap(primary)
+	require.Error(t, only)
+	assert.Equal(t, "E1010: primary", only.Error())
+	assert.ErrorIs(t, only, primary)
+}
+
+//////
+// #24 - Copy must be nil-safe.
+//////
+
+func TestFix_Copy_NilSafety(t *testing.T) {
+	// Bad path (pre-fix: nil-panicked).
+	target := &CustomError{}
+	assert.Same(t, target, Copy(nil, target))
+
+	// Edge: nil target gets a fresh CustomError.
+	src := Factory("some message", WithErrorCode("E1010"))
+	copied := Copy(src, nil)
+	require.NotNil(t, copied)
+	assert.Equal(t, "some message", copied.Message)
+	assert.Equal(t, "E1010", copied.Code)
+
+	// Edge: both nil.
+	assert.NotNil(t, Copy(nil, nil))
+}
+
+//////
+// #25 - IsCustomError/To/IsHTTPStatus/IsErrorCode/IsRetryable must see a
+// CustomError anywhere in the chain (errors.As), not only at the top level.
+//////
+
+func TestFix_IsHelpers_TraverseChain(t *testing.T) {
+	cE := New(
+		"some message",
+		WithStatusCode(http.StatusNotFound),
+		WithErrorCode("E1010"),
+		WithRetryable(true),
+	)
+
+	// Bad path (pre-fix: all of these returned false).
+	for name, wrapped := range map[string]error{
+		"fmt.Errorf": fmt.Errorf("outer: %w", cE),
+		"Wrap":       Wrap(errors.New("outer"), cE),
+	} {
+		assert.True(t, IsCustomError(wrapped), name)
+		assert.True(t, IsHTTPStatus(wrapped, http.StatusNotFound), name)
+		assert.True(t, IsErrorCode(wrapped, "E1010"), name)
+		assert.True(t, IsRetryable(wrapped), name)
+
+		found, ok := To(wrapped)
+		require.True(t, ok, name)
+		assert.Equal(t, "E1010", found.Code, name)
+	}
+
+	// Happy path: direct CustomError still matches.
+	assert.True(t, IsCustomError(cE))
+	assert.True(t, IsHTTPStatus(cE, http.StatusNotFound))
+
+	// Edge: plain errors still don't match.
+	plain := errors.New("plain")
+	assert.False(t, IsCustomError(plain))
+	assert.False(t, IsHTTPStatus(plain, http.StatusNotFound))
+	assert.False(t, IsErrorCode(plain, "E1010"))
+	assert.False(t, IsRetryable(plain))
+
+	// Edge: From still only treats a DIRECT CustomError specially - wrapping
+	// keeps the outer context.
+	fromWrapped := From(fmt.Errorf("outer: %w", cE))
+	assert.Contains(t, fromWrapped.Error(), "outer:")
+}
+
+//////
+// #26 - Error()/APIError() field output must be deterministic (sorted by
+// key), regardless of sync.Map range order.
+//////
+
+func TestFix_Fields_DeterministicOrder(t *testing.T) {
+	build := func() error {
+		return New("some message", WithFields(map[string]interface{}{
+			"zulu":  1,
+			"alpha": 2,
+			"mike":  3,
+		}))
+	}
+
+	want := "some message. Fields: alpha=2, mike=3, zulu=1"
+
+	// Pre-fix this was flaky: sync.Map range order is random.
+	for range 20 {
+		assert.Equal(t, want, build().Error())
+	}
+}
+
+//////
+// #27 - Concurrency: shared factory/catalog errors must be safe to use from
+// many goroutines (race detector must stay quiet).
+//////
+
+func TestFix_ConcurrentSharedErrorUsage(t *testing.T) {
+	factory := Factory(
+		"some message",
+		WithErrorCode("E1010"),
+		WithTag("tag1", "tag2"),
+		WithField("key1", "value1"),
+	)
+
+	catalog := MustNewCatalog("myapp")
+	catalog.MustSet("SOME_CODE", "some message", WithTag("tag1"), WithField("key1", "value1"))
+
+	var wg sync.WaitGroup
+
+	for i := range 50 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			// Factory methods on a shared error.
+			err := factory.NewFailedToError(WithField("goroutine", i), WithTag("extra"))
+			_ = err.Error()
+
+			// Catalog reads return independent copies.
+			cE := catalog.MustGet("SOME_CODE", WithField("goroutine", i))
+			_ = cE.Error()
+			_, _ = json.Marshal(cE) //nolint:errchkjson
+
+			// From on a shared sentinel returns a copy.
+			_ = From(factory, WithField("goroutine", i)).Error()
+
+			// Template reads.
+			_, _ = GetTemplate("en", FailedTo.String())
+		}()
+	}
+
+	wg.Wait()
+
+	// The shared instances were never mutated.
+	assert.Equal(t, "some message", factory.Message)
+	assert.Equal(t, "E1010: some message. Tags: tag1, tag2. Fields: key1=value1", factory.Error())
+}
